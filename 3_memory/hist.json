@@ -1,0 +1,174 @@
+[
+    {
+        "type": "ai",
+        "data": {
+            "content": "Hello, how can I help you?",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    },
+    {
+        "type": "human",
+        "data": {
+            "content": "I am Raj. I want to know the capital of India.",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "India's capital is Delhi",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "Hello, how can I help you?",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    },
+    {
+        "type": "human",
+        "data": {
+            "content": "I am Raj. I want to know the capital of India.",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "India's capital is Delhi",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    },
+    {
+        "type": "human",
+        "data": {
+            "content": "My name is Rue",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "Nice to meet you, Rue. We've already discussed the capital of India - it's Delhi. Is there anything else I can help you with?",
+            "additional_kwargs": {},
+            "response_metadata": {
+                "token_usage": {
+                    "completion_tokens": 31,
+                    "prompt_tokens": 127,
+                    "total_tokens": 158,
+                    "completion_time": 0.047107668,
+                    "completion_tokens_details": null,
+                    "prompt_time": 0.009187684,
+                    "prompt_tokens_details": null,
+                    "queue_time": 0.061737576,
+                    "total_time": 0.056295352
+                },
+                "model_name": "llama-3.1-8b-instant",
+                "system_fingerprint": "fp_4387d3edbb",
+                "service_tier": "on_demand",
+                "finish_reason": "stop",
+                "logprobs": null,
+                "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--019e1b31-686f-75e1-8257-203b2f724dd2-0",
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+                "input_tokens": 127,
+                "output_tokens": 31,
+                "total_tokens": 158
+            }
+        }
+    },
+    {
+        "type": "human",
+        "data": {
+            "content": "yes, how are you what is my name",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "I'm a helpful assistant, and I'm functioning properly, thanks for asking. As for your name, I remember, Rue is your name. I'm glad I could recall that correctly!",
+            "additional_kwargs": {},
+            "response_metadata": {
+                "token_usage": {
+                    "completion_tokens": 39,
+                    "prompt_tokens": 176,
+                    "total_tokens": 215,
+                    "completion_time": 0.066904676,
+                    "completion_tokens_details": null,
+                    "prompt_time": 0.013958748,
+                    "prompt_tokens_details": null,
+                    "queue_time": 0.055408958,
+                    "total_time": 0.080863424
+                },
+                "model_name": "llama-3.1-8b-instant",
+                "system_fingerprint": "fp_4387d3edbb",
+                "service_tier": "on_demand",
+                "finish_reason": "stop",
+                "logprobs": null,
+                "model_provider": "groq"
+            },
+            "type": "ai",
+            "name": null,
+            "id": "lc_run--019e1b31-b56b-76b2-9c66-dc1ad8b5363c-0",
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": {
+                "input_tokens": 176,
+                "output_tokens": 39,
+                "total_tokens": 215
+            }
+        }
+    }
+]
