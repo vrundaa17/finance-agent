@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, START,END
 from langchain_groq import ChatGroq
 from langchain_community.tools import DuckDuckGoSearchRun
 from langgraph.checkpoint.memory import InMemorySaver
+
 from typing import TypedDict, List
 from dotenv import load_dotenv
 load_dotenv()
@@ -12,6 +13,7 @@ os.environ['LANGCHAIN_PROJECT']='research-evals'
 from langsmith import Client
 from langsmith.evaluation import evaluate
 client = Client()
+
 
 class SupervisorState(TypedDict):
     task: str
@@ -25,7 +27,6 @@ class ResearchState(TypedDict):
     results : List[str]
     is_sufficient : bool
     final_answer : str
-    
     
     
 llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)

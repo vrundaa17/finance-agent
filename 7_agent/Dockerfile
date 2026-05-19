@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "ma1.py"] 
+CMD ["python", "ma1.py"]  
