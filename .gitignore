@@ -8,3 +8,4 @@ agent_db/
 docs/
 *.py[cod]
 .ipynb_checkpoints/
+know/
