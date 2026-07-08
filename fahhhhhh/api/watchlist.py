@@ -1,10 +1,10 @@
 '''
 sqlite connection methods 
 '''
-import sqlite3
+import sqlite3,pytz
 from db import get_connection
-from datetime import datetime
-
+from datetime import datetime,timedelta
+IST = pytz.timezone("Asia/Kolkata")
 
 def create_watchlist(name ):
     with get_connection() as conn:
@@ -127,18 +127,35 @@ def get_reports(stock_name):
         return dict(row) if row else None
     
     
-#--------
-
-def add_alert(stock_name:str, condition : str,threshold : float ):
+#------------------------------------------------------------------------------------------------------------------------------------------------------------
+#alert
+def add_alert(stock_name:str, condition : str,threshold : float ,is_persistent: bool = False, expires_days: int = 5):
+    expires_at =  (datetime.now() + timedelta(days=expires_days)).isoformat()
+    now = datetime.now(IST)
+    if not (9 <= now.hour < 15 or (now.hour == 15 and now.minute <= 30)):
+        return {"status":"closed", "message":"Market is closed. Show up tomorrow"}
+    if now.hour < 9 or (now.hour == 9 and now.minute < 15):
+        return {"status":"closed", "message":"Market is closed. Show up tomorrow"}
+    
+    
     with get_connection() as conn:
         conn.execute(
-            """INSERT INTO alert (stock_name,condition,threshold,created_at)
-                VALUES(?,?,?,?)""",
-                (stock_name.upper(),condition,threshold,datetime.now().isoformat())
+            """INSERT INTO alert
+               (stock_name, condition, threshold, is_persistent, expires_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (stock_name.upper(), condition, threshold,
+             int(is_persistent),
+             None if is_persistent else expires_at,
+             datetime.now().isoformat())
         )
         conn.commit()
         return {
-            "status":"created", "stock_name":stock_name.upper(),"condition":condition,"threshold":threshold
+            "status": "created",
+            "stock": stock_name.upper(),
+            "condition": condition,
+            "threshold": threshold,
+            "persistent": is_persistent,
+            "expires_at": None if is_persistent else expires_at
         }
 
 def get_active_alerts():
@@ -155,18 +172,21 @@ def mark_alert_triggered(alert_id: int, price: float):
         alert = conn.execute(
            "SELECT * FROM alert WHERE id = ?", (alert_id,)
         ).fetchone()
-        conn.execute(
-            "UPDATE alert SET triggered = 1, triggered_at = ? WHERE id = ?",
-            (now, alert_id)
-        )
+        
         conn.execute(
             """INSERT INTO alert_log (stock_name, condition, threshold, price_at_trigger, triggered_at)
                VALUES (?, ?, ?, ?, ?)""",
             (alert["stock_name"], alert["condition"],
              alert["threshold"], price, now)
         )
+        
+        if alert['is_persistent']:
+            print(f"[Alerts] Persistent alert triggered for {alert['stock_name']}")
+        else:
+            conn.execute(
+                "UPDATE alert SET triggered = 1, triggered_at = ? WHERE id = ?",
+            )
         conn.commit()
-
 
 def get_alert_log() -> list[dict]:
     with get_connection() as conn:
@@ -187,3 +207,33 @@ def get_alerts(stock_name: str = None) -> list[dict]:
         else:
             rows = conn.execute("SELECT * FROM alert").fetchall()
         return [dict(r) for r in rows]
+    
+ 
+def user_delete_alert(alert_id: int) -> dict:
+    """User removes a specific alert by its id"""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, stock_name FROM alert WHERE id=?", (alert_id,)
+        ).fetchone()
+
+        if not row:
+            return {"status": "error", "message": f"Alert with id {alert_id} not found"}
+
+        conn.execute("DELETE FROM alert WHERE id=?", (alert_id,))
+        conn.commit()
+        return {"status": "deleted", "message": f"Alert for {row['stock_name']} deleted"}
+       
+    
+def cleanup_alerts():
+    with get_connection() as conn:
+        now = datetime.datetime.now().isoformat()
+        deleted = conn.execute(
+            """DELETE FROM alerts 
+               WHERE is_persistent = 0 AND expires_at IS NOT NULL AND expires_at < ? AND triggered = 0""",
+            (now,)
+        ).rowcount
+        conn.commit()
+        if deleted:
+            print(f"[Scheduler] Cleaned up {deleted}")
+            
+            

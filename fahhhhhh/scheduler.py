@@ -1,5 +1,5 @@
 import sys
-import os
+import os,datetime
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -8,6 +8,7 @@ import yfinance as yf
 import pytz
 from agent.analyse import build_graph
 import api.watchlist as watchlist
+from api.watchlist import cleanup_alerts
 
 IST = pytz.timezone("Asia/Kolkata")
 graph = build_graph()
@@ -34,6 +35,11 @@ def run_daily_reports():
     
     
 def check_price_alerts():
+    now = datetime.datetime.now(IST)
+    if not (9 <= now.hour < 15 or (now.hour == 15 and now.minute <= 30)):
+        return
+    if now.hour < 9 or (now.hour == 9 and now.minute < 15):
+        return
     alerts = watchlist.get_active_alerts()
     if not alerts:
         return
@@ -65,6 +71,9 @@ def check_price_alerts():
             print(f"[ALERT] TRIGGERED : {stock} is {price}")
             print(f"({alert['condition']} {alert['threshold']})")
 
+
+
+
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=IST)
     scheduler.add_job(
@@ -76,11 +85,19 @@ def start_scheduler():
     )
     scheduler.add_job(
         check_price_alerts,
-        IntervalTrigger(minutes=15),
+        IntervalTrigger(minutes=7),
         id="price_alerts",
         name="Price Alert Check",
         replace_existing=True
     )
+    scheduler.add_job(
+        cleanup_alerts,
+        CronTrigger(hour=0,minute=0,timezone=IST),
+        id="cleanup_alert",
+        name="Clean Up Expired Alert",
+        replace_existing=True,
+    )
+    
     scheduler.start()
     print(f"[Scheduler] started ")
     return scheduler

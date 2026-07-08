@@ -188,7 +188,7 @@ def generate_all_charts(chart_types: list[str],price_history: dict, fundamentals
  
     return paths
 
-
+# def cleanup_
 # if __name__ =="__main__":
 #     from find import get_price_history,get_kyc_of_stock
 #     price_history = get_price_history('CIPLA.NS',period='1y')

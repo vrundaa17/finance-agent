@@ -11,6 +11,7 @@ import api.schema as schema
 from scheduler import start_scheduler
 from fastapi.staticfiles import StaticFiles
 import os,asyncio
+from datetime import datetime
 from contextlib import asynccontextmanager
 
 graph = None
@@ -54,7 +55,49 @@ async def run_report(stock_name : str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "financial-ai-agent"}
+    return {"status": "ok", "service": "fahhhhhh"}
+
+
+@app.get("/stock/{stock_name}")
+def stock_overview(stock_name:str):
+    return find.get_kyc_of_stock(stock_name)
+
+@app.get("/quotes")
+def get_quotes(tickers: str):
+    """Get live price + change for multiple stocks """
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    quotes = []
+    for sym in symbols:
+        try:
+            data = find.get_kyc_of_stock(sym)
+            price = data.get("current_price")
+            prev = data.get("previous_close")
+            change = round(price - prev, 2) if price and prev else None
+            change_pct = round((change / prev) * 100, 2) if change and prev else None
+            quotes.append({
+                "stock_name": sym,
+                "company_name": data.get("company_name"),
+                "current_price": price,
+                "change": change,
+                "change_pct": change_pct,
+            })
+        except Exception as e:
+            quotes.append({"stock_name": sym, "error": str(e)})
+    return {"quotes": quotes}
+
+
+@app.get("/news")
+def general_news(limit: int = 8):
+    """Get general market news"""
+    try:
+        news = find.get_news_finnhub("general")
+        trimmed = news[:limit]
+        for item in trimmed:
+            if item.get("time"):
+                item["time"] = datetime.fromtimestamp(item["time"]).strftime("%Y-%m-%d %H:%M")
+        return {"news": trimmed}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # watchlist - db
@@ -92,6 +135,8 @@ def delete_existing_watchlist(watchlist_name: str):
     return watchlist.delete_watchlist(watchlist_name)
 
 
+
+
 #reports
 @app.post("/report/{stock_name}")
 async def single_report(stock_name : str):
@@ -104,9 +149,11 @@ async def single_report(stock_name : str):
         "stock": stock_name.upper(),
         "company_name": result["fundamentals"].get("company_name"),
         "current_price": result["fundamentals"].get("current_price"),
+        "fundamentals": result.get("fundamentals", {}),
         "report": result.get("report"),
         "charts": result.get("charts", {}),
     }
+
 
 @app.post("/report/watchlist")
 async def watchlist_report(request : schema.WatchlistReportRequest):
@@ -181,19 +228,28 @@ def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamental
     
     
     
+#--------------------------------------------------------------------------------------------------------------------------------------------------------    
 #alerts
 @app.post("/alerts")
-def create_alert(stock_name: str,condition: str, threshold:float ):
-    return watchlist.add_alert(stock_name,condition,threshold)
+def create_alert(stock_name: str,condition: str, threshold:float,is_persistent:bool,expire_days:int):
+    """Add a new alert"""
+    return watchlist.add_alert(stock_name,condition,threshold,is_persistent,expire_days)
 
 @app.get("/alerts")
 def list_alerts(stock_name:str):
+    """List all my alerts"""
     return watchlist.get_alerts(stock_name)
 
 @app.get("/alerts/active")
 def list_active_alerts():
+    """List all the active alerts """
     return watchlist.get_active_alerts()
 
 @app.get("/alerts/logs")
 def list_alert_logs():
+    """Show my alert log"""
     return watchlist.get_alert_log()
+
+@app.delete("/alerts/{alert_id}")
+def delete_alert(alert_id: int):
+    return watchlist.user_delete_alert(alert_id)

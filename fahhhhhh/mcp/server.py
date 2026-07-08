@@ -158,15 +158,17 @@ def get_report(stock_name:str):
 #-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #alert tools
 @mcp.tool()
-def set_price_alert(stock_name: str, condition: str, threshold: float) -> dict:
+def set_price_alert(stock_name: str, condition: str, threshold: float,
+                    is_persistent: bool = False, expires_days: int = 30) -> dict:
     """
     Set a price alert for a stock.
     condition: 'above' or 'below'
     threshold: price level to trigger at
-    Example: set_price_alert('AAPL', 'below', 180) 
-    triggers when AAPL drops below $180.
+    is_persistent: if True, alert never expires and resets after triggering
+    expires_days: days until alert auto-deletes if not triggered (default 30)
+    Example: set_price_alert('RELIANCE.NS', 'below', 1200, is_persistent=True)
     """
-    return watchlist.add_alert(stock_name, condition, threshold)
+    return watchlist.add_alert(stock_name, condition, threshold, is_persistent, expires_days)
 
 @mcp.tool()
 def view_alerts(stock_name: str = "") -> list:

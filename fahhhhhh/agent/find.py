@@ -17,19 +17,22 @@ def get_kyc_of_stock(sname):
         "stock_name": sname.upper(),
         "company_name": info.get("longName", "N/A"),
         "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-        "previous_close": info.get("previousClose"),
         "market_cap": info.get("marketCap"),
+        "industry" : info.get("industry"),
+        "profit_margin": info.get("profitMargins"),
+        "5_year_dividend":info.get("fiveYearAvgDividendYield"),
+        
+        "previous_close": info.get("previousClose"),
         "pe_ratio": info.get("trailingPE"),
         "forward_pe": info.get("forwardPE"),
         "eps": info.get("trailingEps"),
-        "industry" : info.get("industry"),
         "sector": info.get("sector"),
-        "5_year_dividend":info.get("fiveYearAvgDividendYield"),
+        
         "52_week_high":info.get("fiftyTwoWeekHigh"),
         "52_week_low":info.get("fiftyTwoWeekLow"),
         "debt_to_equity": info.get("debtToEquity"),
         "revenue_growth": info.get("revenueGrowth"),
-        "profit_margin": info.get("profitMargins"),
+        
         
     }
 

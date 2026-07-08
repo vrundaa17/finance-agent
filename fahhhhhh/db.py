@@ -12,7 +12,7 @@ def init_db():
         conn.execute(
             """ CREATE TABLE IF NOT EXISTS watchlists
             (
-                id INTEGER PRIMARY KEY, 
+                id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 name TEXT NOT NULL UNIQUE,
                 created_at TEXT NOT NULL
                 )
@@ -21,7 +21,7 @@ def init_db():
         conn.execute(
             """ CREATE TABLE IF NOT EXISTS stocks
             (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stock_name TEXT NOT NULL,
                 added_at TEXT NOT NULL,
                 watchlist_id INTEGER NOT NULL,
@@ -32,7 +32,7 @@ def init_db():
         )
         conn.execute(
             """ CREATE TABLE IF NOT EXISTS report(
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stock_name TEXT NOT NULL,
                 report TEXT NOT NULL,
                 generated_at TEXT NOT NULL
@@ -40,10 +40,12 @@ def init_db():
         )
         conn.execute(
             """ CREATE TABLE IF NOT EXISTS alert(
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stock_name TEXT NOT NULL,
                 condition TEXT NOT NULL,
                 threshold REAL NOT NULL,
+                is_persistent INTEGER DEFAULT 0,
+                expires_at TEXT,
                 triggered INTEGER DEFAULT 0,
                 triggered_at TEXT,
                 created_at TEXT NOT NULL
@@ -53,7 +55,7 @@ def init_db():
         conn.execute(
             """ 
             CREATE TABLE IF NOT EXISTS alert_log (
-            id NTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             stock_name TEXT NOT NULL,
             condition TEXT NOT NULL,
             threshold REAL NOT NULL,
