@@ -8,7 +8,8 @@ import yfinance as yf
 import pytz
 from agent.analyse import build_graph
 import api.watchlist as watchlist
-from api.watchlist import cleanup_alerts
+from visualise import cleanup_charts
+from api.watchlist import cleanup_reports,cleanup_alerts
 
 IST = pytz.timezone("Asia/Kolkata")
 graph = build_graph()
@@ -91,10 +92,24 @@ def start_scheduler():
         replace_existing=True
     )
     scheduler.add_job(
+        cleanup_reports,
+        CronTrigger(hour=0,minute=0,timezone=IST),
+        id="cleanup_reports",
+        name="Clean Up Expired Reports",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         cleanup_alerts,
         CronTrigger(hour=0,minute=0,timezone=IST),
-        id="cleanup_alert",
+        id="cleanup_alerts",
         name="Clean Up Expired Alert",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        cleanup_charts,
+        CronTrigger(hour=0,minute=0,timezone=IST),
+        id="cleanup_charts",
+        name="Clean Up Charts",
         replace_existing=True,
     )
     

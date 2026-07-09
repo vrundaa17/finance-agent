@@ -125,6 +125,20 @@ def get_reports(stock_name):
             (stock_name.upper(),)
         ).fetchone()
         return dict(row) if row else None
+
+
+def list_reports_today() -> list[dict]:
+    """Get all stocks that were analysed today"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT stock_name, generated_at FROM report
+               WHERE substr(generated_at, 1, 10) = ?
+               ORDER BY generated_at DESC""",
+            (today,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+    
     
     
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -184,7 +198,7 @@ def mark_alert_triggered(alert_id: int, price: float):
             print(f"[Alerts] Persistent alert triggered for {alert['stock_name']}")
         else:
             conn.execute(
-                "UPDATE alert SET triggered = 1, triggered_at = ? WHERE id = ?",
+                "UPDATE alert SET triggered = 1, triggered_at = ? WHERE id = ?",(now,alert_id)
             )
         conn.commit()
 
@@ -228,7 +242,7 @@ def cleanup_alerts():
     with get_connection() as conn:
         now = datetime.datetime.now().isoformat()
         deleted = conn.execute(
-            """DELETE FROM alerts 
+            """DELETE FROM alert
                WHERE is_persistent = 0 AND expires_at IS NOT NULL AND expires_at < ? AND triggered = 0""",
             (now,)
         ).rowcount
@@ -236,4 +250,24 @@ def cleanup_alerts():
         if deleted:
             print(f"[Scheduler] Cleaned up {deleted}")
             
-            
+def is_reported_today(stock_name: str) -> bool:
+    """Check if a report was already generated today for this stock"""
+    latest = get_reports(stock_name)
+    if not latest:
+        return False
+    generated_date = latest["generated_at"][:10]  
+    today = datetime.now().strftime("%Y-%m-%d")
+    return generated_date == today
+
+
+def cleanup_reports():
+    """Delete all reports not generated today"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        deleted = conn.execute(
+            "DELETE FROM report WHERE substr(generated_at, 1, 10) != ?",
+            (today,)
+        ).rowcount
+        conn.commit()
+        if deleted:
+            print(f"[Scheduler] Cleaned up {deleted} old reports")

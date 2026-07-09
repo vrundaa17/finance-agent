@@ -10,3 +10,4 @@ docs/
 *.py[cod]
 .ipynb_checkpoints/
 know/
+charts/

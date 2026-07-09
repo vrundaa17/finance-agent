@@ -4,7 +4,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.dates as mdates
-from datetime import datetime
+from datetime import datetime,time
 
 
 OUTPUT_DIR = "/Users/prashant/Desktop/fxis/task/fahhhhhh/charts"
@@ -188,7 +188,30 @@ def generate_all_charts(chart_types: list[str],price_history: dict, fundamentals
  
     return paths
 
-# def cleanup_
+
+
+
+def cleanup_charts():
+    if not os.path.isdir(OUTPUT_DIR):
+        return
+    today = time.strftime("%Y-%m-%d")
+    deleted = 0
+
+    for filename in os.listdir(OUTPUT_DIR):
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        if not os.path.isfile(filepath):
+            continue
+        file_date = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(filepath)))
+        if file_date != today:
+            try:
+                os.remove(filepath)
+                deleted += 1
+            except OSError as e:
+                print(f"[Scheduler] Could not delete {filepath}: {e}")
+
+    if deleted:
+        print(f"[Scheduler] Cleaned up {deleted} old chart(s)")
+        
 # if __name__ =="__main__":
 #     from find import get_price_history,get_kyc_of_stock
 #     price_history = get_price_history('CIPLA.NS',period='1y')

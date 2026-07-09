@@ -65,6 +65,7 @@ def analyse_fundamental(state:AgentState):
     return{**state, "analysis_fundamentals":response.content}
 
 
+
 def analyse_news(state: AgentState):
     if state.get("error") or not state.get("news"):
         return state
@@ -152,22 +153,128 @@ def compile_report(state:AgentState):
 
 
 
+def check_data_quality(state:AgentState):
+    f = state.get("fundamentals",{})
+    history = state.get("price_history",{})
+    
+    issues =[]
+    if not f.get("current_price"):
+        issues.append("price unavailable")
+    if not f.get("pe_ratio"):
+        issues.append("P/E ratio not available")
+    if len(history.get("close", [])) < 20:
+        issues.append("insufficient price history for risk calculation")
+        
+    return {**state, "data_issues": issues, "data_ok": len(issues) == 0}
+
+def route_after_data_check(state:AgentState):
+    if state.get("data_ok"):
+        return "analyse_fundamentals"
+    return "partial_report"
+
+def partial_report(state:AgentState):
+    issues = state.get("data_issues",[])
+    f = state.get("fundamentals",{})
+    report = f"""
+        Limited report for {state['stock_name']} - {','.join(issues)}.
+        Available Data:
+        - Company : {f.get('company_name','Unknown')}
+        - Price : {f.get('current_price',"Unavailable")}
+        - Sector : {f.get('sector','Unknown')}
+        Full analysis can not be carried out.
+        This is not a financial advice.
+        Try again after few minutes.
+        Thank you for your understanding!"""
+    return {**state, "report": report}
+
+
+def route_after_fundamentals(state:AgentState):
+    f = state.get("fundamentals",{})
+    closes = state.get("price_history",{}).get("close",[])
+    high_risk = False
+    if f.get("debt_to_equity") and f['debt_to_equity']>200:
+        high_risk = True
+        
+    if closes:
+        high = max(closes)
+        current = closes[-1]
+        if (current - high)/high <-0.3:
+            high_risk = True
+    if f.get("profit_margin") and f["profit_margin"]<0:
+        high_risk =True
+        
+    return "high_risk_analysis" if high_risk else "analyse_news"
+
+
+def high_risk_analysis(state:AgentState):
+    f = state.get("fundamentals",{})
+    closes = state.get("price_history",{}).get("close",[])
+    prompt=f"""
+        You are a senior risk analyst. This stock has triggered HIGH RISK signals.
+        Write a detailed 4-5 sentence risk warning for {state['stock_name']}.
+        Be specific about the risks. Be direct — this is for a professional advisor.
+
+        Risk signals detected:
+        - Debt to Equity: {f.get('debt_to_equity')}
+        - Profit Margin: {f.get('profit_margin')}
+        - Current vs 52w High: {f.get('current_price')} vs {f.get('52_week_high')}
+
+        End with: HIGH RISK RATING. This is not financial advice.
+    """
+    response = llm.invoke(prompt)
+    return {**state, "anallysis_risk":response.content, "risk_level":"HIGH"}
+    
+def route_after_news_fetch(state:AgentState):
+    news = state.get("news",{})
+    articles = news.get("articles",[]) if news else []
+    
+    if not articles:
+        return "analyse_risk"
+    return "analyse_news"
+        
+        
+        
 def build_graph():
+    # stock - news - check 
+    #                 route - partial
+    #                       - analyse fun -high risk |  anal news -
+    #                                           
     graph = StateGraph(AgentState)
     
     graph.add_node("fetch_fundamentals",fetch_fundamentals)
     graph.add_node("fetch_news",fetch_news)
+    graph.add_node("check_data_quality",check_data_quality)
+    graph.add_node("partial_report",partial_report)
     graph.add_node("analyse_fundamentals",analyse_fundamental)
     graph.add_node("analyse_news",analyse_news)
+    graph.add_node("high_risk_analysis",high_risk_analysis)
     graph.add_node("analyse_risk",analyse_risk)
     graph.add_node("compile_report",compile_report)
     
     graph.set_entry_point('fetch_fundamentals')
+    
     graph.add_edge('fetch_fundamentals','fetch_news')
-    graph.add_edge("fetch_news", "analyse_fundamentals")
-    graph.add_edge("analyse_fundamentals", "analyse_news")
-    graph.add_edge("analyse_news", "analyse_risk")
+    graph.add_conditional_edges(
+        "check_data_quality", route_after_data_check,{
+            "analyse_fundamentals":"analyse_fundamentals",
+            "partial_report":"partial_report",
+        } )
+    graph.add_conditional_edges(
+        "analyse_fundamentals", route_after_fundamentals,{
+            'high_risk_analysis':'high_risk_analysis',
+            'analyse_news':'analyse_news',
+        }
+    )
+    graph.add_edge("high_risk_analysis","analyse_news")
+    graph.add_conditional_edges(
+        "analyse_news", route_after_news_fetch,{
+            'analyse_risk':'analyse_risk',
+            'analyse_news':'analyse_news',
+        }
+    )
+
     graph.add_edge("analyse_risk", "compile_report")
+    graph.add_edge("partial_report", END)
     graph.add_edge("compile_report", END)
  
     return graph.compile()
