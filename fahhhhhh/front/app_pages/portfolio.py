@@ -1,5 +1,7 @@
 import streamlit as st
 import api_client as api
+import logging
+logger = logging.getLogger(__name__)
 
 def portfolio():
     st.markdown("## 👜 Protfolio")
@@ -11,13 +13,17 @@ def portfolio():
         if st.button("Create"):
             if new_name.strip():
                 res, err = api.api_post("/watchlists", {"name": new_name.strip()})
-                if err:st.error(err)
+                if err:
+                    logger.error(err)
+                    st.error(f"Try again in a while : {err}")
                 else:st.success(f"Created '{new_name}'"); st.rerun()
             else:
                 st.warning("Enter a name.")
 
     watchlists, err = api.api_get("/watchlists")
-    if err: st.error(err)
+    if err:
+        logger.error(err)
+        st.error("Try again in a while")
     elif not watchlists:
         st.info("No watchlists yet — create one above.")
     else:
@@ -39,7 +45,7 @@ def portfolio():
                         st.rerun()
                         
                         
-                # with st.expander(""):
+                # with st.expander(""): 
 
                 stocks_data, _ = api.api_get(f"/watchlists/{name}")
                 stocks = stocks_data.get("stock_name", []) if stocks_data else []
@@ -70,7 +76,9 @@ def portfolio():
                                 "stock_name": new_ticker.strip().upper(),
                                 "notes": ""
                             })
-                            if err: st.error(err)
+                            if err: 
+                                logger.error(err)
+                                st.error(f"Try again in a while : {err}")
                             else:st.success(f"Added {new_ticker.upper()}"); st.rerun()
 
                 # analyse
@@ -83,7 +91,8 @@ def portfolio():
                             data, err = api.api_post("/report/watchlist", {"stock_name": selected})
 
                         if err:
-                            st.error(f"Error: {err}")
+                            logger.error(f"Error: {err}")
+                            st.error(f"Try again in a while : {err}")
                         elif data:
                             st.success(f"✓ {data['successful']}/{data['total']} reports generated")
                             st.caption(f"Analysed: {', '.join(selected)}")

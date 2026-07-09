@@ -1,6 +1,7 @@
 import streamlit as st
 import api_client as api
-
+import logging
+logger = logging.getLogger(__name__)
 def stock_analysis():
     st.markdown("## 💿 Stock Analysis")
     st.divider()
@@ -21,7 +22,8 @@ def stock_analysis():
         with st.spinner(f"🏁 Running multi-agent analysis for {ticker.upper()}... (15-30 sec)"):
             data, err = api.api_post("/report/watchlist", {"stock_name": [ticker.upper()]})
         if err:
-            st.error(f"Failed: {err}")
+            logger.error(f"Failed: {err}")
+            st.error(f"Try again in a while : {err}")
         elif data and data.get("reports"):
             result = data["reports"][0]
             if result.get("status") == "error":
@@ -63,7 +65,8 @@ def stock_analysis():
             charts_data, err = api.api_get(f"/generate_charts/{ticker.upper()}?period={period}&chart_types=price,volume,fundamentals")
 
         if err:
-            st.error(f"Chart error: {err}")
+            logger.error(f"Chart error: {err}")
+            st.error(f"Try again in a while : {err}")
         elif charts_data and charts_data.get("charts"):
             charts = charts_data["charts"]
             st.markdown('<div class="section-label">Charts</div>', unsafe_allow_html=True)

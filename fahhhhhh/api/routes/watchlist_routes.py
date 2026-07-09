@@ -13,7 +13,11 @@ def get_all_watchlists():
 @app.post("/watchlists")
 def create_new_watchlist(request: schema.Watchlist):
     """Create new watchlist"""
-    return watchlist.create_watchlist(request.name)
+    result=  watchlist.create_watchlist(request.name)
+    if result.get("status")=="exists":
+        raise HTTPException(status_code=400,detail=f"Watchlist {request.name} already exists.")
+    return result
+
 
 @app.get("/watchlists/{watchlist_name}")
 def get_stock_watchlist(watchlist_name: str):
@@ -26,16 +30,25 @@ def get_stock_watchlist(watchlist_name: str):
 @app.post("/watchlists/add")
 def add_to_watchlist(body:schema.StockAdd):
     """Add stocks to the watchlist"""
-    return watchlist.add_stock(body.watchlist_name,body.stock_name,body.notes or None)
+    result =  watchlist.add_stock(body.watchlist_name,body.stock_name,body.notes or None)
+    if result.get("status")== "exists":
+        raise HTTPException(status_code=400, detail=f"'{body.stock_name}' is already in '{body.watchlist_name}'")
+    return result
 
 @app.delete("/watchlists/{watchlist_name}/{stock}")
 def remove_stock(watchlist_name:str,stock:str):
     """Remove from the watchlist"""
-    return watchlist.remove_stock(watchlist_name,stock)
+    result=  watchlist.remove_stock(watchlist_name,stock)
+    if result.get("status") == "not found":
+        raise HTTPException(status_code=404, detail=f"'{stock}' not found in '{watchlist_name}'")
+    return result
 
 @app.delete("/watchlists/{watchlist_name}")
 def delete_existing_watchlist(watchlist_name: str):
     """Delete the watchlist"""
-    return watchlist.delete_watchlist(watchlist_name)
+    result =  watchlist.delete_watchlist(watchlist_name)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+    return result
 
 

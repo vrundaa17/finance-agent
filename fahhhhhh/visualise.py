@@ -4,8 +4,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.dates as mdates
-from datetime import datetime,time
-
+from datetime import datetime
+import time
 
 OUTPUT_DIR = "/Users/prashant/Desktop/fxis/task/fahhhhhh/charts"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

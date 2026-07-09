@@ -3,10 +3,13 @@ import api.watchlist as watchlist
 import agent.find as find
 import asyncio,os,datetime
 from agent.analyse import build_graph
+import logging
+logger = logging.getLogger(__name__)
 
 app = APIRouter(tags=['core'])
 graph= None
-
+import logging
+logger = logging.getLogger(__name__)
 def init_graph():
     global graph
     graph = build_graph()
@@ -16,7 +19,10 @@ def init_graph():
 async def run_report(stock_name: str):
     if watchlist.is_reported_today(stock_name):
         cached = watchlist.get_reports(stock_name)
-        kyc = find.get_kyc_of_stock(stock_name)
+        try:
+            kyc = find.get_kyc_of_stock(stock_name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         return {"fundamentals": kyc, "report": cached["report"], "charts": {}}
 
     loop = asyncio.get_event_loop()
@@ -53,8 +59,11 @@ def get_quotes(tickers: str):
                 "change": change,
                 "change_pct": change_pct,
             })
+    
         except Exception as e:
+            logger.error("Error while fetching live stock...")
             quotes.append({"stock_name": sym, "error": str(e)})
+    logger.info("Live stocks fetched...")
     return {"quotes": quotes}
 
 
@@ -66,9 +75,10 @@ def general_news(limit: int = 8):
         trimmed = news[:limit]
         for item in trimmed:
             if item.get("time"):
-                item["time"] = datetime.fromtimestamp(item["time"]).strftime("%Y-%m-%d %H:%M")
+                item["time"] = datetime.datetime.fromtimestamp(item["time"]).strftime("%Y-%m-%d %H:%M")
+        logger.info("Live news fetched...")
         return {"news": trimmed}
     except Exception as e:
-        # print(str(e))
+        logger.error(f"Error while fetching live news {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
         

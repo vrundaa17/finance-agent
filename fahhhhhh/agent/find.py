@@ -3,6 +3,9 @@ import finnhub
 import pandas as pd
 import os
 from dotenv import load_dotenv
+import logging 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 client = finnhub.Client(api_key= os.getenv("FINHUB_API"))
 
@@ -10,8 +13,9 @@ def get_kyc_of_stock(sname):
     stock = yf.Ticker(sname)
     info = stock.info
     
-    if not info:
-        raise ValueError("The stock is not there")
+    if not info or (info.get("currentPrice") is None and info.get("regularMarketPrice") is None):
+        logger.error(f"Stock not there : {sname}")
+        raise ValueError(f"'{sname}' is not a valid stock symbol")
     
     return{
         "stock_name": sname.upper(),
@@ -40,7 +44,8 @@ def get_price_history(sname,period='5d'):
     stock = yf.Ticker(sname)
     hist = stock.history(period=period)
     if hist.empty:
-        raise ValueError("NO history for the selected stock.")
+        logger.error(f"{sname} - no history ")
+        raise ValueError("No history for the selected stock.")
     return {
         "stock_name": sname.upper(),
         "dates": hist.index.strftime("%Y-%m-%d").tolist(),

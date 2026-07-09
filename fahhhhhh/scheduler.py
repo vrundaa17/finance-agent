@@ -16,8 +16,8 @@ graph = build_graph()
 
 
 def run_daily_reports():
-    print("[Schhh] running daily rep")
-    watchlists = watchlist.list_watchlists()
+    print("[Scheduler] running daily rep")
+    watchlists = watchlist.list_watchlist()
 
     for wl in watchlists:
         tickers = watchlist.get_stock(wl["name"])
@@ -71,7 +71,6 @@ def check_price_alerts():
             watchlist.mark_alert_triggered(alert['id'],price)
             print(f"[ALERT] TRIGGERED : {stock} is {price}")
             print(f"({alert['condition']} {alert['threshold']})")
-
 
 
 

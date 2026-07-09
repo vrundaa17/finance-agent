@@ -2,7 +2,8 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from api_client import api_get, api_post
 from datetime import datetime
-
+import logging
+logger = logging.getLogger(__name__)
 
 def home():
     st.markdown("## 👾 Your finance agent ")
@@ -34,14 +35,14 @@ def home():
         with st.spinner(f"🏁 Running full analysis for {quick_ticker.upper()}..."):
             data, err = api_post("/report/watchlist", {"stock_name": [quick_ticker.upper()]})
         if err:
-            st.error(f"Error: {err}")
-            
+            logger.error(f"Error: {err}")
+            st.error(f"Try again in a while : {err}")
         elif data and data.get("reports"):
             result = data["reports"][0]
             if result.get("status") == "error":
                 st.error(result.get("error", "Analysis failed"))
             else:
-                st.success(f"🦾 Report generated for {data.get('company_name', quick_ticker)}")
+                st.success(f"🦾 Report generated for {result.get('company_name', quick_ticker)}")
                 f = data.get("fundamentals", {})
             
                 c1, c2, c3 = st.columns(3)
@@ -75,7 +76,8 @@ def home():
         quotes_data, qerr = api_get(f"/quotes?tickers={default_tickers}")
 
         if qerr:
-            st.error(qerr)
+            logger.error(qerr)
+            st.error(f"Try again in a while : {qerr}")
         elif quotes_data and quotes_data.get("quotes"):
             for q in quotes_data["quotes"]:
                 if q.get("error"):
@@ -92,9 +94,10 @@ def home():
 
         news_data, news_err = api_get("/news?limit=6")
         if news_err:
-            st.error(news_err)
+            logger.error(news_err)
+            st.error(f"Try again in a while : {news_err}")
         elif news_data and news_data.get("news"):
-            st.write("DEBUG:", news_data)
+            # st.write("DEBUG:", news_data)
             for n in news_data["news"]:
                 st.markdown(f"""
                 <div class="alert-row" style="flex-direction:column;align-items:flex-start;">

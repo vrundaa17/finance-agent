@@ -1,12 +1,23 @@
 from fastapi import APIRouter, HTTPException
 import api.watchlist as watchlist
+from api.schema import AlertCreate
+import agent.find as find
+
 
 app = APIRouter(tags=['Alert'])
 
 @app.post("/alerts")
-def create_alert(stock_name: str,condition: str, threshold:float,is_persistent:bool,expire_days:int):
+def create_alert(request :AlertCreate ):
     """Add a new alert"""
-    return watchlist.add_alert(stock_name,condition,threshold,is_persistent,expire_days)
+    try:
+        find.get_kyc_of_stock(request.stock_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    result = watchlist.add_alert(request.stock_name,request.condition,request.threshold,
+        request.is_persistent,request.expire_days)
+    if result.get("status") == "closed":
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
 
 @app.get("/alerts")
 def list_alerts(stock_name:str):
@@ -25,4 +36,7 @@ def list_alert_logs():
 
 @app.delete("/alerts/{alert_id}")
 def delete_alert(alert_id: int):
-    return watchlist.user_delete_alert(alert_id)
+    result =  watchlist.user_delete_alert(alert_id)
+    if result.get("status")=="error":
+        raise HTTPException(status_code=404, detail=result["message"])
+    return result

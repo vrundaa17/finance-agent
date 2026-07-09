@@ -1,5 +1,7 @@
 import streamlit as st
 import api_client as api
+import logging
+logger = logging.getLogger(__name__)
 def alert():
     st.markdown("## 🚨 Price Alerts")
     st.divider()
@@ -25,7 +27,7 @@ def alert():
 
             res, err = api.api_post(
                 "/alerts",
-                params={
+                {
                     "stock_name": a_ticker.upper(),
                     "condition": a_condition,
                     "threshold": float(a_threshold),
@@ -34,7 +36,7 @@ def alert():
                 }
             )
             if err:
-                st.error(err)
+                st.error(f"Try again in a while : {err}")
             else:
                 st.success("Alert created!")
                 st.json(res)
@@ -48,7 +50,9 @@ def alert():
 
     st.markdown('<div>🤿 Active Alerts</div>', unsafe_allow_html=True)
     active, err = api.api_get("/alerts/active")
-    if err: st.error(err)
+    if err: 
+        logger.error(err)
+        st.error(f"Try again in a while : {err}")
     elif not active:
         st.info("No active alerts. Set one above.")
     else:
@@ -79,7 +83,9 @@ def alert():
 
     st.markdown('<div class="section-label">😮‍💨 Triggered Alerts Log</div>', unsafe_allow_html=True)
     log, err = api.api_get("/alerts/logs")
-    if err: st.error(err)
+    if err: 
+        logger.error(err)
+        st.error(f"Try again in a while : {err}")
     elif not log:
         st.info("No alerts have triggered yet.")
     else:

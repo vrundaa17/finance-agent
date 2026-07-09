@@ -6,7 +6,8 @@ from agent.state import AgentState
 from agent.find import get_kyc_of_stock, get_price_history, get_news_by_stock, get_news_finnhub
 from dotenv import load_dotenv
 import statistics
-
+import logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -16,8 +17,10 @@ def fetch_fundamentals(state:AgentState):
     try:
         fundamentals = get_kyc_of_stock(state['stock_name'])
         price_history = get_price_history(state['stock_name'],period='3mo')
+        logger.info(f"Fetched fundamentals : {state['stock_name']}")
         return {**state, "fundamentals": fundamentals, "price_history": price_history}
     except Exception as e:
+        logger.error(f"Fetch Fundamentals failed {state['stock_name']} : {str(e)}")
         return {**state, "error": f"fetch_fundamentals failed: {str(e)}"}
         
         
@@ -25,12 +28,14 @@ def fetch_news(state:AgentState):
     try:
         news_stock = get_news_by_stock(state['stock_name'])
         news_category = get_news_finnhub("general")  
+        logger.info(f"Fetched News : {state['stock_name']}")
         return {
             **state,
             "news": {"source": "yfinance", "articles": news_stock},  
             "news_category": news_category
         }
     except Exception as e:
+        logger.error(f"Fetch News failed {state['stock_name']} : {str(e)}")
         return {**state, "error": f"fetch_news failed: {str(e)}"} 
     
     
@@ -62,6 +67,7 @@ def analyse_fundamental(state:AgentState):
     """
     
     response = llm.invoke(prompt)
+    logger.info(f"Analysed Fundamentals {state['stock_name']}")
     return{**state, "analysis_fundamentals":response.content}
 
 
@@ -88,6 +94,7 @@ def analyse_news(state: AgentState):
         Write in plain English, no bullet points."""
  
     response = llm.invoke(prompt)
+    logger.info(f"Analysed News : {state['stock_name']}")
     return {**state, "analysis_news": response.content}
  
       
@@ -122,6 +129,7 @@ def analyse_risk(state:AgentState):
     """
     
     response = llm.invoke(prompt)
+    logger.info(f"Analysed Risk : {state['stock_name']}")
     return {**state, "analysis_risk": response.content}
 
 
@@ -149,6 +157,7 @@ def compile_report(state:AgentState):
         Start with the company name and current price. End with the risk disclaimer."""
     
     response = llm.invoke(prompt)
+    logger.info(f"Report compiled : {state['stock_name']}")
     return {**state, "report": response.content}
 
 
@@ -156,6 +165,7 @@ def compile_report(state:AgentState):
 def check_data_quality(state:AgentState):
     f = state.get("fundamentals",{})
     history = state.get("price_history",{})
+    logger.info(f"Checking DATA QUALITY : {state['stock_name']}")
     
     issues =[]
     if not f.get("current_price"):
@@ -164,7 +174,6 @@ def check_data_quality(state:AgentState):
         issues.append("P/E ratio not available")
     if len(history.get("close", [])) < 20:
         issues.append("insufficient price history for risk calculation")
-        
     return {**state, "data_issues": issues, "data_ok": len(issues) == 0}
 
 def route_after_data_check(state:AgentState):
@@ -228,6 +237,7 @@ def high_risk_analysis(state:AgentState):
         Be specific about the risks. Be direct — this is for a professional advisor.
 
         Risk signals detected:
+        - Closes : {closes}
         - Debt to Equity: {f.get('debt_to_equity')}
         - Profit Margin: {f.get('profit_margin')}
         - Current vs 52w High: {f.get('current_price')} vs {f.get('52_week_high')}
@@ -284,7 +294,7 @@ def build_graph():
     graph.add_edge("analyse_risk", "compile_report")
     graph.add_edge("partial_report", END)
     graph.add_edge("compile_report", END)
- 
+    logger.info("Graph compiled...")
     return graph.compile()
 
 # gr = build_graph()

@@ -6,6 +6,9 @@ from db import get_connection
 from datetime import datetime,timedelta
 IST = pytz.timezone("Asia/Kolkata")
 
+import logging
+logger = logging.getLogger(__name__)
+
 def create_watchlist(name ):
     with get_connection() as conn:
         try:
@@ -14,8 +17,10 @@ def create_watchlist(name ):
                 (name, datetime.now().isoformat())
                 )
             conn.commit()
+            logger.info(f"Watchlist created : {name}")
             return {'status' : 'created','watchlist':name}
         except sqlite3.IntegrityError:
+            logger.error(f'Error in creating watchlist {name}')
             return{'status':'exists','watchlist':name}
 
 
@@ -24,10 +29,11 @@ def list_watchlist():
         rows = conn.execute(
             """
                 SELECT w.name, w.created_at, COUNT(t.id) as ticker_count
-            FROM watchlists w
-            LEFT JOIN stocks t ON t.watchlist_id = w.id
-            GROUP BY w.id
+                FROM watchlists w
+                LEFT JOIN stocks t ON t.watchlist_id = w.id
+                GROUP BY w.id
         """).fetchall()
+        logger.info(f"Listing all the watchlist...{len(rows)}")
         return [dict(r) for r in rows]
         
         
@@ -45,6 +51,7 @@ def delete_watchlist(watchlist_name:str):
             "DELETE FROM watchlists where id=?",(watchlist['id'],)
         )
         conn.commit()
+        logger.info(f"Deleting the watchlist {watchlist_name}")
         return {'status':'deleted','watchlist':watchlist_name}
 
 
@@ -56,6 +63,7 @@ def add_stock(watchlist_name,stock_name,notes=None):
         ).fetchone()
         
         if not watchlist:
+            logger.info(f"The watchlist doesnot exists... {watchlist_name}")
             return {'status' : 'error', 'message':f'Watchlist {watchlist_name} not found'}
         
         try: 
@@ -64,8 +72,10 @@ def add_stock(watchlist_name,stock_name,notes=None):
                 (watchlist['id'], stock_name.upper(),datetime.now().isoformat(),notes)
             )
             conn.commit()
+            logger.info(f"Added stock : {stock_name} | watchlist : {watchlist_name}")
             return {'status': 'added', 'stock_name':stock_name.upper(),'watchlist':watchlist_name}
         except sqlite3.IntegrityError:
+            logger.error(f"Exists already {stock_name} | {watchlist_name}")
             return {"status": "exists", "stock_name": stock_name.upper(), "watchlist": watchlist_name}
         
         
@@ -77,6 +87,7 @@ def remove_stock(watchlist_name, stock_name):
         ).fetchone()
         
         if not watchlist:
+            logger.info(f"ERROR {watchlist_name} not there")
             return {'status' : 'error', 'message':f'Watchlist {watchlist_name} not found'}
         
         cursor = conn.execute(
@@ -86,10 +97,11 @@ def remove_stock(watchlist_name, stock_name):
         conn.commit()
         
         if cursor.rowcount ==0:
+            logger.error(f"Not found {stock_name} | {watchlist_name}")
             return{
                 'status':'not found', 'stock_name' :stock_name.upper(), 'watchlist' : watchlist_name
             }
-        
+        logger.info(f"Removed stock : {stock_name} | watchlist : {watchlist_name}")
         return{'status':'removed','stock_name':stock_name.upper(), 'watchlist':watchlist_name}
             
                    
@@ -100,12 +112,15 @@ def get_stock(watchlist_name):
         ).fetchone()
  
         if not watchlist:
+            logger.error(f"Watchlist {watchlist_name} not found")
             return []
         
         rows = conn.execute(
             "SELECT stock_name FROM stocks WHERE watchlist_id = ? ORDER BY added_at",
             (watchlist["id"],)
         ).fetchall()
+        
+        logger.info(f"Fetched stocks in watchlist : {watchlist_name}")
         return [r["stock_name"] for r in rows]
 
 
@@ -116,6 +131,7 @@ def report(stock_name,report):
             (stock_name.upper(), report, datetime.now().isoformat())
         )
         conn.commit()
+        logger.info(f"Report added {stock_name}")
 
 
 def get_reports(stock_name):
@@ -124,6 +140,7 @@ def get_reports(stock_name):
             "SELECT report, generated_at FROM report WHERE stock_name = ? ORDER BY generated_at DESC LIMIT 1",
             (stock_name.upper(),)
         ).fetchone()
+        logger.info(f"Fetched report for {stock_name}")
         return dict(row) if row else None
 
 
@@ -137,6 +154,7 @@ def list_reports_today() -> list[dict]:
                ORDER BY generated_at DESC""",
             (today,)
         ).fetchall()
+        logger.info(f"List of reports for {today}")
         return [dict(r) for r in rows]
     
     
@@ -147,8 +165,10 @@ def add_alert(stock_name:str, condition : str,threshold : float ,is_persistent: 
     expires_at =  (datetime.now() + timedelta(days=expires_days)).isoformat()
     now = datetime.now(IST)
     if not (9 <= now.hour < 15 or (now.hour == 15 and now.minute <= 30)):
+        logger.info("Market closed")
         return {"status":"closed", "message":"Market is closed. Show up tomorrow"}
     if now.hour < 9 or (now.hour == 9 and now.minute < 15):
+        logger.info("Market closed")
         return {"status":"closed", "message":"Market is closed. Show up tomorrow"}
     
     
@@ -163,6 +183,7 @@ def add_alert(stock_name:str, condition : str,threshold : float ,is_persistent: 
              datetime.now().isoformat())
         )
         conn.commit()
+        logger.info(f"Alert created : {stock_name} ")
         return {
             "status": "created",
             "stock": stock_name.upper(),
@@ -177,6 +198,7 @@ def get_active_alerts():
         rows = conn.execute(
             "SELECT * FROM alert WHERE triggered = 0"
         ).fetchall()
+        
         return [dict(r) for r in rows]
     
     
@@ -195,11 +217,12 @@ def mark_alert_triggered(alert_id: int, price: float):
         )
         
         if alert['is_persistent']:
-            print(f"[Alerts] Persistent alert triggered for {alert['stock_name']}")
+            logger.info(f"[Alerts] Persistent alert triggered for {alert['stock_name']}")
         else:
             conn.execute(
                 "UPDATE alert SET triggered = 1, triggered_at = ? WHERE id = ?",(now,alert_id)
             )
+        logger.info(f"Alert triggered {alert['stock_name']}")
         conn.commit()
 
 def get_alert_log() -> list[dict]:
@@ -231,16 +254,18 @@ def user_delete_alert(alert_id: int) -> dict:
         ).fetchone()
 
         if not row:
+            logger.error(f"Alert not found {row['stock_name']}")
             return {"status": "error", "message": f"Alert with id {alert_id} not found"}
 
         conn.execute("DELETE FROM alert WHERE id=?", (alert_id,))
+        logger.info(f"Deleted Alert for {row['stock_name']}")
         conn.commit()
         return {"status": "deleted", "message": f"Alert for {row['stock_name']} deleted"}
        
     
 def cleanup_alerts():
     with get_connection() as conn:
-        now = datetime.datetime.now().isoformat()
+        now = datetime.now().isoformat()
         deleted = conn.execute(
             """DELETE FROM alert
                WHERE is_persistent = 0 AND expires_at IS NOT NULL AND expires_at < ? AND triggered = 0""",
@@ -248,7 +273,7 @@ def cleanup_alerts():
         ).rowcount
         conn.commit()
         if deleted:
-            print(f"[Scheduler] Cleaned up {deleted}")
+            logger.info(f"[Scheduler] Cleaned up {deleted}")
             
 def is_reported_today(stock_name: str) -> bool:
     """Check if a report was already generated today for this stock"""
@@ -270,4 +295,4 @@ def cleanup_reports():
         ).rowcount
         conn.commit()
         if deleted:
-            print(f"[Scheduler] Cleaned up {deleted} old reports")
+            logger.info(f"[Scheduler] Cleaned up {deleted} old reports")

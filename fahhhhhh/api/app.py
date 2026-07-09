@@ -10,8 +10,14 @@ from api.routes import core_route
 from api.routes import watchlist_routes, report_routes, alert_routes
 from contextlib import asynccontextmanager
 import os
+import logging
 
-
+logging.basicConfig(
+    level = logging.INFO,
+    format = "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt = "%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

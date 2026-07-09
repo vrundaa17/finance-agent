@@ -12,3 +12,10 @@ class WatchlistReportRequest(BaseModel):
     stock_name: list[str] = Field(description="Stock Name for report request", default_factory=lambda: ["RELIANCE.NS"])
     period: str  = Field(description="Time period of the data", default='1y')
     
+    
+class AlertCreate(BaseModel):
+    stock_name: str
+    condition: str
+    threshold: float
+    is_persistent: bool = False
+    expire_days: int = 5
