@@ -1,0 +1,11 @@
+*.db
+charts/
+watchlist.db
+watchlist/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+.env
+task/
+venv/

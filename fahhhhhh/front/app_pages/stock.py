@@ -49,13 +49,14 @@ def stock_analysis():
 
             if charts_data and charts_data.get("charts"):
                 charts = charts_data["charts"]
-                if charts.get("price"):
-                    st.image(charts["price"], use_container_width=True)
+                
                 c1, c2 = st.columns(2)
                 if charts.get("volume"):
                     c1.image(charts["volume"], use_container_width=True)
                 if charts.get("fundamentals"):
                     c2.image(charts["fundamentals"], use_container_width=True)
+                if charts.get("price"):
+                    st.image(charts["price"], use_container_width=True)
 
     if run_charts and ticker:
         with st.spinner("🌩️ Generating charts..."):

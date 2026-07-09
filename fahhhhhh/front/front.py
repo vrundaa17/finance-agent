@@ -58,7 +58,7 @@ st.markdown("""
         padding: 20px 24px;
         line-height: 1.8;
         color: #cbd5e1;
-        font-size: 14px;
+        font-size: 18px;
         white-space: pre-wrap;
     }
 
@@ -147,5 +147,3 @@ elif page == "💼 Portfolio":
 
 elif page == "‼️ Alerts":
     alert()
-    
-     

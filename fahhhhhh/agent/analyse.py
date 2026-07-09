@@ -203,7 +203,20 @@ def route_after_fundamentals(state:AgentState):
     if f.get("profit_margin") and f["profit_margin"]<0:
         high_risk =True
         
-    return "high_risk_analysis" if high_risk else "analyse_news"
+        
+    news = state.get("news", {})
+    articles = news.get("articles", []) if news else []
+    has_news = len(articles) > 0
+    
+    if high_risk and has_news:
+        return "high_risk_analysis"
+    if high_risk and not has_news:
+        return "high_risk_analysis"
+    if not has_news:
+        return "analyse_risk"
+    
+    return "analyse_news"
+    # return "high_risk_analysis" if high_risk else "analyse_news"
 
 
 def high_risk_analysis(state:AgentState):
@@ -222,9 +235,9 @@ def high_risk_analysis(state:AgentState):
         End with: HIGH RISK RATING. This is not financial advice.
     """
     response = llm.invoke(prompt)
-    return {**state, "anallysis_risk":response.content, "risk_level":"HIGH"}
+    return {**state, "analysis_risk":response.content, "risk_level":"HIGH"}
     
-def route_after_news_fetch(state:AgentState):
+# def route_after_news_fetch(state:AgentState):
     news = state.get("news",{})
     articles = news.get("articles",[]) if news else []
     
@@ -254,6 +267,7 @@ def build_graph():
     graph.set_entry_point('fetch_fundamentals')
     
     graph.add_edge('fetch_fundamentals','fetch_news')
+    graph.add_edge('fetch_news', 'check_data_quality') 
     graph.add_conditional_edges(
         "check_data_quality", route_after_data_check,{
             "analyse_fundamentals":"analyse_fundamentals",
@@ -266,13 +280,7 @@ def build_graph():
         }
     )
     graph.add_edge("high_risk_analysis","analyse_news")
-    graph.add_conditional_edges(
-        "analyse_news", route_after_news_fetch,{
-            'analyse_risk':'analyse_risk',
-            'analyse_news':'analyse_news',
-        }
-    )
-
+    graph.add_edge("analyse_news", "analyse_risk")
     graph.add_edge("analyse_risk", "compile_report")
     graph.add_edge("partial_report", END)
     graph.add_edge("compile_report", END)

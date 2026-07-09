@@ -11,3 +11,10 @@ docs/
 .ipynb_checkpoints/
 know/
 charts/
+
+*.png
+*.wav
+*.docs
+*.pdf
+*.txt
+db/
