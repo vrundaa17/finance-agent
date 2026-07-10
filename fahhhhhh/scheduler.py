@@ -10,6 +10,8 @@ from agent.analyse import build_graph
 import api.watchlist as watchlist
 from visualise import cleanup_charts
 from api.watchlist import cleanup_reports,cleanup_alerts
+import logging
+logger = logging.getLogger(__name__)
 
 IST = pytz.timezone("Asia/Kolkata")
 graph = build_graph()
@@ -27,12 +29,12 @@ def run_daily_reports():
                 result = graph.invoke({"stock_name": stock})
                 if result.get("report"):
                     watchlist.report(stock,result['report'])
-                    print(f"[Scheduler]  {stock} report found")
+                    logger.info(f"[Scheduler]  {stock} report found")
                 else:
-                    print(f"[Scheduler] X {stock} failed : {result.get("error")}")
+                    logger.error(f"[Scheduler] X {stock} failed : {result.get('error')}")
             except Exception as e:
-                print(f"[Scheduler] X {stock} - Exception : {e}")
-    print("[Scheduler] Daily reports done")
+                logger.error(f"[Scheduler] X {stock} - Exception : {e}")
+    logger.info("[Scheduler] Daily reports done")
     
     
 def check_price_alerts():
@@ -54,7 +56,7 @@ def check_price_alerts():
             if price:
                 prices[stock]= price
         except Exception as e:
-            print(f"[Alerts] Could not fetch price for {stock}: {e}")
+            logger.error(f"[Alerts] Could not fetch price for {stock}: {e}")
     
     for alert in alerts:
         stock = alert['stock_name']
@@ -69,8 +71,8 @@ def check_price_alerts():
             
         if triggered:
             watchlist.mark_alert_triggered(alert['id'],price)
-            print(f"[ALERT] TRIGGERED : {stock} is {price}")
-            print(f"({alert['condition']} {alert['threshold']})")
+            logger.info(f"[ALERT] TRIGGERED : {stock} is {price}")
+            logger.info(f"({alert['condition']} {alert['threshold']})")
 
 
 
@@ -113,7 +115,7 @@ def start_scheduler():
     )
     
     scheduler.start()
-    print(f"[Scheduler] started ")
+    logger.info(f"[Scheduler] started ")
     return scheduler
 
 

@@ -11,7 +11,7 @@ class AgentState(TypedDict):
     analysis_risk :Optional[str]
     report:Optional[str]
     error : Optional[str]
-    
+    targets: Optional[dict]
     data_issues: Optional[list]
     data_ok: Optional[bool]
     risk_level:Optional[str]

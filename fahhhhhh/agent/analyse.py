@@ -1,8 +1,10 @@
 import sys
-sys.path.insert(0, "/Users/prashant/Desktop/fxis/task/fahhhhhh")
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from langgraph.graph import StateGraph,END
 from langchain_groq import ChatGroq
 from agent.state import AgentState
+from agent.target import calculate_targets
 from agent.find import get_kyc_of_stock, get_price_history, get_news_by_stock, get_news_finnhub
 from dotenv import load_dotenv
 import statistics
@@ -25,6 +27,8 @@ def fetch_fundamentals(state:AgentState):
         
         
 def fetch_news(state:AgentState):
+    if state.get("error"):
+        return state
     try:
         news_stock = get_news_by_stock(state['stock_name'])
         news_category = get_news_finnhub("general")  
@@ -152,6 +156,9 @@ def compile_report(state:AgentState):
 
         --- RISK ASSESSMENT
         {state.get('analysis_risk', 'Not available')}
+        
+        --- BUY/SELL TARGETS
+        {state.get('targets', {}).get('summary', 'Not available')}
 
         Write a professional brief that reads as a single narrative, not three separate sections.
         Start with the company name and current price. End with the risk disclaimer."""
@@ -163,6 +170,8 @@ def compile_report(state:AgentState):
 
 
 def check_data_quality(state:AgentState):
+    if state.get("error"):
+        return state
     f = state.get("fundamentals",{})
     history = state.get("price_history",{})
     logger.info(f"Checking DATA QUALITY : {state['stock_name']}")
@@ -182,6 +191,8 @@ def route_after_data_check(state:AgentState):
     return "partial_report"
 
 def partial_report(state:AgentState):
+    if state.get("error"):
+        return state
     issues = state.get("data_issues",[])
     f = state.get("fundamentals",{})
     report = f"""
@@ -246,7 +257,18 @@ def high_risk_analysis(state:AgentState):
     """
     response = llm.invoke(prompt)
     return {**state, "analysis_risk":response.content, "risk_level":"HIGH"}
-    
+
+
+def analyse_targets(state: AgentState):
+    if state.get("error") or not state.get("price_history"):
+        return state
+    targets = calculate_targets(
+        state["price_history"],
+        state["fundamentals"]
+    )
+    return {**state, "targets": targets}
+
+
 # def route_after_news_fetch(state:AgentState):
     news = state.get("news",{})
     articles = news.get("articles",[]) if news else []
@@ -273,6 +295,7 @@ def build_graph():
     graph.add_node("high_risk_analysis",high_risk_analysis)
     graph.add_node("analyse_risk",analyse_risk)
     graph.add_node("compile_report",compile_report)
+    graph.add_node("analyse_targets", analyse_targets)
     
     graph.set_entry_point('fetch_fundamentals')
     
@@ -291,7 +314,8 @@ def build_graph():
     )
     graph.add_edge("high_risk_analysis","analyse_news")
     graph.add_edge("analyse_news", "analyse_risk")
-    graph.add_edge("analyse_risk", "compile_report")
+    graph.add_edge("analyse_risk",    "analyse_targets")
+    graph.add_edge("analyse_targets", "compile_report")
     graph.add_edge("partial_report", END)
     graph.add_edge("compile_report", END)
     logger.info("Graph compiled...")
@@ -301,3 +325,5 @@ def build_graph():
 # if __name__ =="__main__":
 #     ans = gr.invoke({'stock_name':"ETERNAL.NS"})
 #     print(ans.get("report") or ans.get("error"))
+
+

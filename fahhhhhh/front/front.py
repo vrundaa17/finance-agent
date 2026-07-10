@@ -11,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-BASE_URL = "http://localhost:8000"
 
 st.markdown("""
     <style>

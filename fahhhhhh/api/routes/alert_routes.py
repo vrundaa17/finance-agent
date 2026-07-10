@@ -1,20 +1,17 @@
 from fastapi import APIRouter, HTTPException
 import api.watchlist as watchlist
 from api.schema import AlertCreate
-import agent.find as find
-
 
 app = APIRouter(tags=['Alert'])
 
 @app.post("/alerts")
 def create_alert(request :AlertCreate ):
     """Add a new alert"""
-    try:
-        find.get_kyc_of_stock(request.stock_name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     result = watchlist.add_alert(request.stock_name,request.condition,request.threshold,
         request.is_persistent,request.expire_days)
+    
+    if result.get("status") == "invalid":
+        raise HTTPException(status_code=400, detail=result["message"])
     if result.get("status") == "closed":
         raise HTTPException(status_code=400, detail=result["message"])
     return result

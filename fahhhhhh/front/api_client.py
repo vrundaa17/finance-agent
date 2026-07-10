@@ -1,7 +1,9 @@
 import requests
-BASE_URL = "http://localhost:8000"
 import logging
 logger = logging.getLogger(__name__)
+import os
+
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 def _extract_error(e,r=None):
     if r is not None:

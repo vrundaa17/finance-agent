@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import api.watchlist as watchlist
 import api.schema as schema
-
 app= APIRouter(tags=['Watchlist'])
 
 
@@ -31,6 +30,8 @@ def get_stock_watchlist(watchlist_name: str):
 def add_to_watchlist(body:schema.StockAdd):
     """Add stocks to the watchlist"""
     result =  watchlist.add_stock(body.watchlist_name,body.stock_name,body.notes or None)
+    if result.get("status") == "closed":
+        raise HTTPException(status_code=400, detail=result["message"])
     if result.get("status")== "exists":
         raise HTTPException(status_code=400, detail=f"'{body.stock_name}' is already in '{body.watchlist_name}'")
     return result

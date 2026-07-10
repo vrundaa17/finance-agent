@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import api.watchlist as watchlist
 import agent.find as find
-import asyncio,os,datetime
+import asyncio,datetime
 from agent.analyse import build_graph
 import logging
 logger = logging.getLogger(__name__)

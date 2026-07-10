@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import sys
-sys.path.insert(0, "/Users/prashant/Desktop/fxis/task/fahhhhhh")
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db import init_db
 from scheduler import start_scheduler
 
@@ -9,7 +10,6 @@ from fastapi.staticfiles import StaticFiles
 from api.routes import core_route
 from api.routes import watchlist_routes, report_routes, alert_routes
 from contextlib import asynccontextmanager
-import os
 import logging
 
 logging.basicConfig(

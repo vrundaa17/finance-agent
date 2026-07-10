@@ -23,7 +23,7 @@ def stock_analysis():
             data, err = api.api_post("/report/watchlist", {"stock_name": [ticker.upper()]})
         if err:
             logger.error(f"Failed: {err}")
-            st.error(f"Try again in a while : {err}")
+            st.error(err)
         elif data and data.get("reports"):
             result = data["reports"][0]
             if result.get("status") == "error":
@@ -43,22 +43,22 @@ def stock_analysis():
                 st.markdown('<div class="section-label">Daily Brief</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="report-box">{result.get("report", "No report generated.")}</div>', unsafe_allow_html=True)
 
+                st.divider()
+                st.markdown('<div class="section-label">Charts</div>', unsafe_allow_html=True)
+                with st.spinner("🌩️ Generating charts..."):
+                    charts_data, charts_err = api.api_get(f"/generate_charts/{ticker.upper()}?period={period}&chart_types=price,volume,fundamentals")
 
-            st.divider()
-            st.markdown('<div class="section-label">Charts</div>', unsafe_allow_html=True)
-            with st.spinner("🌩️ Generating charts..."):
-                charts_data, _ = api.api_get(f"/generate_charts/{ticker.upper()}?period={period}&chart_types=price,volume,fundamentals")
-
-            if charts_data and charts_data.get("charts"):
-                charts = charts_data["charts"]
-                
-                c1, c2 = st.columns(2)
-                if charts.get("volume"):
-                    c1.image(charts["volume"], use_container_width=True)
-                if charts.get("fundamentals"):
-                    c2.image(charts["fundamentals"], use_container_width=True)
-                if charts.get("price"):
-                    st.image(charts["price"], use_container_width=True)
+                if charts_err:
+                    st.warning(f"Charts unavailable: {charts_err}")
+                elif charts_data and charts_data.get("charts"):
+                    charts = charts_data["charts"]
+                    c1, c2 = st.columns(2)
+                    if charts.get("volume"):
+                        c1.image(charts["volume"], use_container_width=True)
+                    if charts.get("fundamentals"):
+                        c2.image(charts["fundamentals"], use_container_width=True)
+                    if charts.get("price"):
+                        st.image(charts["price"], use_container_width=True)
 
     if run_charts and ticker:
         with st.spinner("🌩️ Generating charts..."):
@@ -66,7 +66,7 @@ def stock_analysis():
 
         if err:
             logger.error(f"Chart error: {err}")
-            st.error(f"Try again in a while : {err}")
+            st.error(err)
         elif charts_data and charts_data.get("charts"):
             charts = charts_data["charts"]
             st.markdown('<div class="section-label">Charts</div>', unsafe_allow_html=True)

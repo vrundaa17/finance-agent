@@ -2,6 +2,8 @@ import yfinance as yf
 import finnhub 
 import pandas as pd
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 import logging 
 logger = logging.getLogger(__name__)

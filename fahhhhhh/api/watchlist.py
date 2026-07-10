@@ -1,9 +1,8 @@
-'''
-sqlite connection methods 
-'''
+import agent.find as find
 import sqlite3,pytz
 from db import get_connection
 from datetime import datetime,timedelta
+
 IST = pytz.timezone("Asia/Kolkata")
 
 import logging
@@ -56,6 +55,10 @@ def delete_watchlist(watchlist_name:str):
 
 
 def add_stock(watchlist_name,stock_name,notes=None):
+    try:
+        find.get_kyc_of_stock(stock_name)
+    except ValueError as e:
+        return {'status': 'invalid', 'message': str(e)}
     create_watchlist(watchlist_name)
     with get_connection() as conn:
         watchlist = conn.execute(
@@ -162,6 +165,12 @@ def list_reports_today() -> list[dict]:
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 #alert
 def add_alert(stock_name:str, condition : str,threshold : float ,is_persistent: bool = False, expires_days: int = 5):
+    try:
+        find.get_kyc_of_stock(stock_name)
+    except ValueError as e:
+        return {'status': 'invalid', 'message': str(e)}
+    
+    
     expires_at =  (datetime.now() + timedelta(days=expires_days)).isoformat()
     now = datetime.now(IST)
     if not (9 <= now.hour < 15 or (now.hour == 15 and now.minute <= 30)):

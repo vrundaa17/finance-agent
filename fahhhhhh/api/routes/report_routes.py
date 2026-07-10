@@ -25,6 +25,7 @@ async def watchlist_report(request : schema.WatchlistReportRequest):
                     "current_price": None,
                     "fundamentals": {},
                     "report": None,
+                    "target" : None,
                     "error": str(result),
                     "status": "error",
                 })
@@ -35,8 +36,9 @@ async def watchlist_report(request : schema.WatchlistReportRequest):
                 "current_price": result.get("fundamentals", {}).get("current_price"),
                 "fundamentals": result.get("fundamentals", {}),
                 "report": result.get("report"),
+                "targets": result.get("targets", {}),
                 "error": result.get("error"),
-                "status": "success" if result.get("report") else "error",
+                "status": "error" if result.get("error") else "success",
             })
 
         logger.info(f"Report generation for stock :{request.stock_name}")
@@ -91,10 +93,10 @@ def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamental
     """Generate charts for a stock and return public url"""
     
     try:
-        price_data = find.get_price_history(stock_name,period)
         stock_data = find.get_kyc_of_stock(stock_name)
+        price_data = find.get_price_history(stock_name,period)
         paths = generate_all_charts(chart_types,price_data,stock_data,stock_name)
-        base_url='http://localhost:8000'
+        base_url= os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
         urls = {
             chart_type: f"{base_url}/charts/{os.path.basename(path)}"
             for chart_type, path in paths.items()

@@ -190,16 +190,3 @@ def view_alert_log() -> list:
 if __name__ == "__main__":
     mcp.run()
     
-    
-    
-
-# "mcpServers": {
-#     "faa": {
-#         "command": "/Users/prashant/Desktop/fxis/task/venv/bin/python3",
-#         "args": ["/Users/prashant/Desktop/fxis/task/fahhhhhh/mcp/server.py"],
-#         "env": {
-#             "GROQ_API_KEY": "REMOVED_SECRET",
-#             "FINNHUB_API_KEY": "d91mt8hr01qnefofp660d91mt8hr01qnefofp66g"
-#         }
-#     }
-# }
