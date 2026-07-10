@@ -38,9 +38,9 @@ def get_kyc_of_stock(sname):
         "52_week_low":info.get("fiftyTwoWeekLow"),
         "debt_to_equity": info.get("debtToEquity"),
         "revenue_growth": info.get("revenueGrowth"),
-        
-        
     }
+
+
 
 def get_price_history(sname,period='5d'):
     stock = yf.Ticker(sname)

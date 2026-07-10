@@ -64,6 +64,22 @@ def init_db():
             )
             """
         )  
+
+        
+        conn.execute(
+            """ 
+            CREATE TABLE IF NOT EXISTS predict_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stock_name TEXT NOT NULL,
+                predicted_at TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                accuracy REAL NOT NULL,
+                actual_outcome TEXT,
+                was_correct INTEGER,
+                human_flag TEXT,
+                human_note TEXT
+            )
+            """
+        )
         conn.commit()
-        
-        

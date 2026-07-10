@@ -3,6 +3,8 @@ from app_pages.home import home
 from app_pages.stock import stock_analysis
 from app_pages.portfolio import portfolio
 from app_pages.alert import alert
+from app_pages.edit import edit
+import os
 
 st.set_page_config(
     page_title="Financial AI Agent",
@@ -11,6 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 st.markdown("""
     <style>
@@ -129,7 +132,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["🏃 Dashboard", "🚀 Stock Analysis", "💼 Portfolio", "‼️ Alerts"],
+        ["🏃 Dashboard", "🚀 Stock Analysis", "💼 Portfolio", "‼️ Alerts","🪄 Edit"],
         label_visibility="collapsed"
     )
 
@@ -146,3 +149,5 @@ elif page == "💼 Portfolio":
 
 elif page == "‼️ Alerts":
     alert()
+elif page == "🪄 Edit":
+    edit()

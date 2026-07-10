@@ -3,8 +3,10 @@ import api.watchlist as watchlist
 import api.schema as schema
 import asyncio,os
 import agent.find as find
-from visualise import generate_all_charts
+from visualise import generate_all_charts,cleanup_charts
+from agent.target import calculate_targets
 from api.routes.core_route import run_report
+from agent.predict import train_pred
 import logging
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,53 @@ def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamental
         logger.error(f"Chart generation failed : {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@app.delete("/charts/clear")
+def clear_charts():
+    cleanup_charts()
+    return {"status": "cleared"}
+
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------
+# prediction :
+@app.get("/target/{stock_name}")
+def get_targets(stock_name : str, period:str = "3mo"):
+    try :
+        fundamentals = find.get_kyc_of_stock(stock_name)
+        price_history = find.get_price_history(stock_name,period)
+        return calculate_targets(price_history,fundamentals)
+    except Exception as e:
+        raise HTTPException(status_code = 400, detail=str(e))
+
+
+@app.get("/predict/{stock_name}")
+def predict_stock(stock_name:str, period: str="3y"):
+    try:
+        price_history = find.get_price_history(stock_name, period)
+        result = train_pred(price_history)
+        if not result.get("error"):
+            watchlist.save_prediction(stock_name,result["direction"],result["confidence"],result["accuracy"])
+        return result
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+@app.get("/predictions")
+def list_predictions(stock_name: str = None):
+    return watchlist.get_predictions(stock_name)
+
+@app.post("/predictions/{prediction_id}/feedback")
+def human_feedback(prediction_id: int, flag: str, note: str = ""):
+    return watchlist.add_human_feedback(prediction_id, flag, note)
+
+@app.post("/predictions/verify")
+def verify_prediction(stock_name: str, date: str, actual: str):
+    return watchlist.update_actual_outcome(stock_name, date, actual)
+
+@app.delete("/predictions/clear")
+def clean_prediction():
+    return watchlist.clear_predictions()
 
 # @app.post("/report/{stock_name}")
 # async def single_report(stock_name : str):

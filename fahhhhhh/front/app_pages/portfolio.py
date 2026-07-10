@@ -4,7 +4,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def portfolio():
-    st.markdown("## 👜 Protfolio")
+    settings = st.session_state.get("settings", {
+        "currency_symbol": "₹",
+    })
+    
+    st.markdown("## 👜 Portfolio")
     st.divider()
 
  
@@ -99,7 +103,7 @@ def portfolio():
                             for r in data["reports"]:
                                 with st.expander(f"{r.get('company_name', r['stock'])} — {r['stock']} {'✓' if r['status']=='success' else '✗'}"):
                                     if r.get("current_price"):
-                                        st.metric("Price", f"{r['current_price']}")
+                                        st.metric("Price", f"{settings['currency_symbol']}{r['current_price']}")
                                     if r.get("report"):
                                         st.markdown(f'<div class="report-box">{r["report"]}</div>', unsafe_allow_html=True)
                                     if r.get("error"):

@@ -160,7 +160,8 @@ def compile_report(state:AgentState):
         --- BUY/SELL TARGETS
         {state.get('targets', {}).get('summary', 'Not available')}
 
-        Write a professional brief that reads as a single narrative, not three separate sections.
+        Write a professional brief that reads 4 separate sections explaining about every detail.
+        The risk assessment is a must. Be realistic about it not assumption.
         Start with the company name and current price. End with the risk disclaimer."""
     
     response = llm.invoke(prompt)
@@ -172,6 +173,7 @@ def compile_report(state:AgentState):
 def check_data_quality(state:AgentState):
     if state.get("error"):
         return state
+    
     f = state.get("fundamentals",{})
     history = state.get("price_history",{})
     logger.info(f"Checking DATA QUALITY : {state['stock_name']}")
@@ -185,10 +187,13 @@ def check_data_quality(state:AgentState):
         issues.append("insufficient price history for risk calculation")
     return {**state, "data_issues": issues, "data_ok": len(issues) == 0}
 
+
+
 def route_after_data_check(state:AgentState):
     if state.get("data_ok"):
         return "analyse_fundamentals"
     return "partial_report"
+
 
 def partial_report(state:AgentState):
     if state.get("error"):

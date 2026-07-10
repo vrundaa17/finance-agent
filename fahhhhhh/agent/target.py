@@ -18,10 +18,7 @@ def find_local_extrema(prices: list[float], window: int = 5):
 
 
 def cluster_levels(levels: list[float], tolerance: float = 0.015) -> list[dict]:
-    """
-    Groups levels within 1.5% of each other into zones.
-    Returns sorted by strength (number of touches).
-    """
+
     if not levels:
         return []
 

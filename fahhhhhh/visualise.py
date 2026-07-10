@@ -8,7 +8,6 @@ from datetime import datetime
 import time
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "charts")
-# os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def _parse_dates(date_string)-> list[datetime]:

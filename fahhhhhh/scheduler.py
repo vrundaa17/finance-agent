@@ -6,6 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import yfinance as yf
 import pytz
+import agent.find as find
 from agent.analyse import build_graph
 import api.watchlist as watchlist
 from visualise import cleanup_charts
@@ -75,6 +76,21 @@ def check_price_alerts():
             logger.info(f"({alert['condition']} {alert['threshold']})")
 
 
+def verify_prediction():
+    yesterday = (datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    unverified = [p for p in watchlist.get_predictions() if not p["actual_outcome"] and p["predicted_at"].startswith(yesterday[:7])]
+    unique_stocks = list(set(p["stock_name"] for p in unverified))
+    for stock in unique_stocks:
+        try:
+            history = find.get_price_history(stock, "5d")
+            closes = history["close"]
+            if len(closes) >= 2:
+                actual = "UP" if closes[-1] > closes[-2] else "DOWN"
+                watchlist.update_actual_outcome(stock, yesterday, actual)
+                print(f"[Scheduler] Verified {stock}: {actual}")
+        except Exception as e:
+            print(f"[Scheduler] Could not verify {stock}: {e}")
+
 
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=IST)
@@ -94,25 +110,39 @@ def start_scheduler():
     )
     scheduler.add_job(
         cleanup_reports,
-        CronTrigger(hour=0,minute=0,timezone=IST),
+        CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_reports",
         name="Clean Up Expired Reports",
         replace_existing=True,
     )
     scheduler.add_job(
         cleanup_alerts,
-        CronTrigger(hour=0,minute=0,timezone=IST),
+        CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_alerts",
         name="Clean Up Expired Alert",
         replace_existing=True,
     )
     scheduler.add_job(
         cleanup_charts,
-        CronTrigger(hour=0,minute=0,timezone=IST),
+        CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_charts",
         name="Clean Up Charts",
         replace_existing=True,
     )
+    scheduler.add_job(
+        verify_prediction,
+        CronTrigger(hour=12, minute=0, timezone=IST),
+        id="verify_predictions",
+        name="Verify yesterday predictions",
+        replace_existing=True,
+    )
+    # scheduler.add_job(
+    #     watchlist.clear_predictions,
+    #     CronTrigger(hour=17,minute=0,timezone=IST),
+    #     id="cleanup_predictions",
+    #     name="Clean Up predictions",
+    #     replace_existing=True,
+    # )
     
     scheduler.start()
     logger.info(f"[Scheduler] started ")

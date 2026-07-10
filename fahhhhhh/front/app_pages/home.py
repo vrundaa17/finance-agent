@@ -1,19 +1,25 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
-from api_client import api_get, api_post
+import api_client as api
 from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
 
 def home():
+    settings = st.session_state.get("settings", {
+        "default_watchlist": "",
+        "default_period": "3mo",
+        "currency_symbol": "₹",
+    })
+    
     st.markdown("## 👾 Your finance agent ")
     st.caption(f"📅 Today is {datetime.now().strftime('%A, %d %B %Y')}")
     st_autorefresh(interval=60000, key="dashboard_refresh")
     st.divider()
 
-    watchlists, _ = api_get("/watchlists")
-    alerts, _ = api_get("/alerts/active")
-    log, _ = api_get("/alerts/logs")
+    watchlists, _ = api.api_get("/watchlists")
+    alerts, _ = api.api_get("/alerts/active")
+    log, _ = api.api_get("/alerts/logs")
 
     total_stocks = sum(w.get("ticker_count", 0) for w in watchlists) if watchlists else 0
     col1, col2, col3, col4 = st.columns(4)
@@ -33,7 +39,7 @@ def home():
 
     if run_quick and quick_ticker:
         with st.spinner(f"🏁 Running full analysis for {quick_ticker.upper()}..."):
-            data, err = api_post("/report/watchlist", {"stock_name": [quick_ticker.upper()]})
+            data, err = api.api_post("/report/watchlist", {"stock_name": [quick_ticker.upper()]})
         if err:
             logger.error(f"Error: {err}")
             st.error(f"Try again in a while : {err}")
@@ -72,8 +78,13 @@ def home():
     with col_stocks:
         st.markdown('<div class="section-label">🏷️ Watchlist Snapshot</div>', unsafe_allow_html=True)
 
-        default_tickers = "^NSEI,^BSESN,^NSEBANK,RELIANCE.NS"
-        quotes_data, qerr = api_get(f"/quotes?tickers={default_tickers}")
+        if settings["default_watchlist"]:
+            wl_data, _ = api.api_get(f"/watchlists/{settings['default_watchlist']}")
+            tickers = ",".join(wl_data.get("stock_name", [])) if wl_data else "^NSEI,^BSESN,RELIANCE.NS"
+        else:
+            tickers = "^NSEI,^BSESN,^NSEBANK,RELIANCE.NS"
+            
+        quotes_data, qerr = api.api_get(f"/quotes?tickers={tickers}")
 
         if qerr:
             logger.error(qerr)
@@ -85,14 +96,14 @@ def home():
                 else:
                     st.metric(
                         q["stock_name"],
-                        f"{q['current_price']}",
+                        f"{settings['currency_symbol']}{q['current_price']}",
                         f"{q['change']} ({q['change_pct']}%)" if q.get("change") is not None else None
                     )
 
     with col_news:
         st.markdown('<div class="section-label">📰 Market News</div>', unsafe_allow_html=True)
 
-        news_data, news_err = api_get("/news?limit=6")
+        news_data, news_err = api.api_get("/news?limit=6")
         if news_err:
             logger.error(news_err)
             st.error(f"Try again in a while : {news_err}")

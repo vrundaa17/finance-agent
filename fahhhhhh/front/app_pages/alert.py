@@ -5,8 +5,11 @@ logger = logging.getLogger(__name__)
 def alert():
     st.markdown("## 🚨 Price Alerts")
     st.divider()
-
-    # create alert
+    
+    settings = st.session_state.get("settings", {
+        "alert_days": 30,
+    })
+    
     st.markdown('<div class="section-label">Set New Alert</div>', unsafe_allow_html=True)
     c1, c2, c3, c4, c5 ,c6= st.columns([2, 2, 2, 2,2, 1])
     with c1:
@@ -18,7 +21,7 @@ def alert():
     with c4:
         a_persistent = st.selectbox("Y/N",["True","False"],label_visibility="collapsed")
     with c5:
-        a_days = st.number_input("Days", min_value=1, step=1, label_visibility="collapsed")
+        a_days = st.number_input("Days", min_value=1, step=1, value=settings["alert_days"], label_visibility="collapsed")
     with c6:
         set_alert = st.button("Set →")
     

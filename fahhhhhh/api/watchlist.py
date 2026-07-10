@@ -283,6 +283,9 @@ def cleanup_alerts():
         conn.commit()
         if deleted:
             logger.info(f"[Scheduler] Cleaned up {deleted}")
+            return{"status":"cleared"}
+        else:
+            return{"status":"error"}
             
 def is_reported_today(stock_name: str) -> bool:
     """Check if a report was already generated today for this stock"""
@@ -305,3 +308,71 @@ def cleanup_reports():
         conn.commit()
         if deleted:
             logger.info(f"[Scheduler] Cleaned up {deleted} old reports")
+
+
+#-----------------------------------------------------------------------------------------------------------------------------------------
+def save_prediction(stock_name: str, direction: str, confidence: float, accuracy: float) -> dict:
+    with get_connection() as conn:
+        conn.execute(
+            """ INSERT INTO predict_log
+            (stock_name, predicted_at, direction, confidence, accuracy)
+            VALUES (?, ?, ?, ?, ?)
+        """, (stock_name.upper(), datetime.now().isoformat(), direction, confidence, accuracy))
+        
+        conn.commit()
+        return {"status": "saved", "stock": stock_name.upper(), "direction": direction}
+
+def get_predictions(stock_name: str = None) -> list[dict]:
+    with get_connection() as conn:
+        if stock_name:
+            rows = conn.execute(
+                "SELECT * FROM predict_log WHERE stock_name = ? ORDER BY predicted_at DESC",
+                (stock_name.upper(),)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM predict_log ORDER BY predicted_at DESC LIMIT 50"
+            ).fetchall()
+        return [dict(r) for r in rows]
+    
+    
+def update_actual_outcome(stock_name: str, date: str, actual: str):
+    with get_connection() as conn:
+        row = conn.execute("""
+            SELECT id, direction FROM predict_log WHERE stock_name = ? AND predicted_at LIKE ?
+            ORDER BY predicted_at DESC LIMIT 1 """,
+        (stock_name.upper(), f"{date}%")).fetchone()
+
+        if not row:
+            return {"status": "not found"}
+
+        was_correct = 1 if row["direction"] == actual else 0
+        conn.execute("""
+            UPDATE predict_log 
+            SET actual_outcome = ?, was_correct = ?
+            WHERE id = ?
+        """, (actual, was_correct, row["id"]))
+        conn.commit()
+        return {"status": "updated", "was_correct": bool(was_correct)}
+    
+    
+def add_human_feedback(prediction_id: int, flag: str, note: str = "") -> dict:
+    with get_connection() as conn:
+        conn.execute("""
+            UPDATE predict_log 
+            SET human_flag = ?, human_note = ?
+            WHERE id = ?
+        """, (flag, note, prediction_id))
+        conn.commit()
+        return {"status": "feedback saved", "id": prediction_id, "flag": flag}
+
+
+
+def clear_predictions():
+    with get_connection() as conn:
+        deleted = conn.execute("DELETE FROM predict_log")
+        conn.commit()
+        if deleted:
+            return {"status": "cleared"}
+        else:
+            return {"status":"error"}

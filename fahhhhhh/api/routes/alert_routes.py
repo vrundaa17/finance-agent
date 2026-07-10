@@ -37,3 +37,10 @@ def delete_alert(alert_id: int):
     if result.get("status")=="error":
         raise HTTPException(status_code=404, detail=result["message"])
     return result
+
+@app.post("/alerts/clean")
+def clean_alerts():
+    result = watchlist.cleanup_alerts()
+    if result.get("status")=="error":
+        raise HTTPException(status_code = 404, dettail="Nothing Cleared")
+    return {"status":"cleared"}

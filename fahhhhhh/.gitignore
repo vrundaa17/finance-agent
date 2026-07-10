@@ -11,3 +11,5 @@ task/
 venv/
 *.png
 *.wav
+ml/
+*.ipynb
