@@ -376,3 +376,12 @@ def clear_predictions():
             return {"status": "cleared"}
         else:
             return {"status":"error"}
+        
+def cleanup_old_predictions():
+    """Delete predictions older than 5 days."""
+    with get_connection() as conn:
+        conn.execute("""
+            DELETE FROM predict_log 
+            WHERE predicted_at < datetime('now', '-5 days')
+        """)
+        conn.commit()

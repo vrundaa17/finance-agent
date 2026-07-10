@@ -136,13 +136,13 @@ def start_scheduler():
         name="Verify yesterday predictions",
         replace_existing=True,
     )
-    # scheduler.add_job(
-    #     watchlist.clear_predictions,
-    #     CronTrigger(hour=17,minute=0,timezone=IST),
-    #     id="cleanup_predictions",
-    #     name="Clean Up predictions",
-    #     replace_existing=True,
-    # )
+    scheduler.add_job(
+        watchlist.cleanup_old_predictions,
+        CronTrigger(hour=0,minute=0,timezone=IST),
+        id="cleanup_old_predictions",
+        name="Clean Up Old predictions",
+        replace_existing=True,
+    )
     
     scheduler.start()
     logger.info(f"[Scheduler] started ")
