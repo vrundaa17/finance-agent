@@ -13,3 +13,4 @@ venv/
 *.wav
 ml/
 *.ipynb
+ok.py

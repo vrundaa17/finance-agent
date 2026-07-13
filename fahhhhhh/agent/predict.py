@@ -111,6 +111,7 @@ def train_pred(price_history:dict):
     "disclaimer": "ML prediction only. Not financial advice. Backtest accuracy does not guarantee future results."
 }
     
+
 # if __name__=="__main__":
 #     stock= yf.Ticker("TATAPOWER.NS")
 #     # hist = stock.history(period="3y")
