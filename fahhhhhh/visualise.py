@@ -190,26 +190,19 @@ def generate_all_charts(chart_types: list[str],price_history: dict, fundamentals
 
 
 
-def cleanup_charts():
+def clear_all_charts():
     if not os.path.isdir(OUTPUT_DIR):
-        return
-    today = time.strftime("%Y-%m-%d")
+        return 0
     deleted = 0
-
     for filename in os.listdir(OUTPUT_DIR):
         filepath = os.path.join(OUTPUT_DIR, filename)
-        if not os.path.isfile(filepath):
-            continue
-        file_date = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(filepath)))
-        if file_date != today:
+        if os.path.isfile(filepath):
             try:
                 os.remove(filepath)
                 deleted += 1
             except OSError as e:
-                print(f"[Scheduler] Could not delete {filepath}: {e}")
-
-    if deleted:
-        print(f"[Scheduler] Cleaned up {deleted} old chart(s)")
+                print(f"Could not delete {filepath}: {e}")
+    return deleted
         
 # if __name__ =="__main__":
 #     from find import get_price_history,get_kyc_of_stock

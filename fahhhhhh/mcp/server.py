@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 import sys,os
-sys.path.insert(0, "/Users/prashant/Desktop/fxis/task/fahhhhhh")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import agent.find as find
 import api.watchlist as watchlist
 from visualise import generate_all_charts
@@ -8,6 +8,9 @@ import base64
 from mcp.types import Resource
 from urllib.parse import quote
 from agent.analyse import build_graph
+from agent.lstm import train_pred_lstm
+from agent.target import calculate_targets
+
 mcp = FastMCP("yousta")
 graph = build_graph()
 
@@ -185,7 +188,91 @@ def view_alert_log() -> list:
     """
     return watchlist.get_alert_log()
 
+@mcp.tool()
+def predict_stock(stock_name: str, horizon: int = 5) -> dict:
+    """Predict short-term price direction (UP/DOWN) for a stock using the LSTM model.
+    horizon: trading days ahead to predict. Takes 20-40 seconds.
+    """
+    price_history = find.get_price_history(stock_name, "3y")
+    index_history = find.get_price_history("^NSEI", "3y")
+    result = train_pred_lstm(price_history, index_history, horizon=horizon)
+    watchlist.save_prediction(
+        stock_name=stock_name, direction=result["direction"],
+        confidence=result["confidence"], accuracy=result["bd_accuracy"],
+        predicted_price=result["predicted_price"], current_price=result["current_price"],
+        horizon_days=result["horizon_days"],
+    )
+    return result
 
+
+@mcp.tool()
+def get_targets(stock_name: str, period: str = "3mo") -> dict:
+    """Calculate buy/sell target price levels for a stock from recent price action and fundamentals."""
+    price_history = find.get_price_history(stock_name, period)
+    fundamentals_data = find.get_kyc_of_stock(stock_name)
+    return calculate_targets(price_history, fundamentals_data)
+
+
+@mcp.tool()
+def quotes(tickers: str) -> dict:
+    """Get live price and change for one or more comma-separated tickers, e.g. 'RELIANCE.NS,TCS.NS'."""
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    result = []
+    for sym in symbols:
+        try:
+            data = find.get_kyc_of_stock(sym)
+            price = data.get("current_price")
+            prev = data.get("previous_close")
+            change = round(price - prev, 2) if price and prev else None
+            change_pct = round((change / prev) * 100, 2) if change and prev else None
+            result.append({
+                "stock_name": sym, "company_name": data.get("company_name"),
+                "current_price": price, "change": change, "change_pct": change_pct,
+            })
+        except Exception as e:
+            result.append({"stock_name": sym, "error": str(e)})
+    return {"quotes": result}
+
+
+@mcp.tool()
+def market_news(limit: int = 8) -> dict:
+    """Get general market news headlines, not tied to a specific stock."""
+    news_items = find.get_news_finnhub("general")
+    return {"news": news_items[:limit]}
+
+
+@mcp.tool()
+def analyse_watchlist(watchlist_name: str) -> dict:
+    """Run the full AI stock report for every ticker in a saved watchlist."""
+    tickers = watchlist.get_stock(watchlist_name)
+    if not tickers:
+        return {"error": f"Watchlist '{watchlist_name}' not found or empty."}
+    results = {}
+    for stock in tickers:
+        try:
+            result = graph.invoke({"stock_name": stock.upper()})
+            report = result.get("report") or result.get("error")
+            if result.get("report"):
+                watchlist.report(stock, report, targets=result.get("targets"))
+            results[stock] = report
+        except Exception as e:
+            results[stock] = f"error: {str(e)}"
+    return results
+
+
+@mcp.tool()
+def get_predictions(stock_name: str = "") -> list:
+    """View past LSTM predictions, optionally filtered by ticker. Use this to find a
+    prediction's id before calling add_prediction_feedback."""
+    return watchlist.get_predictions(stock_name.upper() if stock_name else None)
+
+
+@mcp.tool()
+def add_prediction_feedback(prediction_id: int, flag: str, note: str = "") -> dict:
+    """Add human feedback on a past LSTM prediction.
+    flag: e.g. 'correct', 'incorrect', 'unsure'.
+    """
+    return watchlist.add_human_feedback(prediction_id, flag, note)
 
 if __name__ == "__main__":
     mcp.run()

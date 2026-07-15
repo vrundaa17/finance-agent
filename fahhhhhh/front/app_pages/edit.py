@@ -175,7 +175,7 @@ def edit():
         d1, d2 = st.columns(2)
         with d1:
             if st.button("Clear All Charts", type="secondary"):
-                result,err= api.api_delete("/charts/clear")
+                result, err = api.api_delete("/charts-clear")
                 if err : st.error(err)
                 else:
                     st.success(f"Deleted chart files")

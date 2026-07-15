@@ -98,13 +98,5 @@ def portfolio():
                             logger.error(f"Error: {err}")
                             st.error(f"Try again in a while : {err}")
                         elif data:
-                            st.success(f"✓ {data['successful']}/{data['total']} reports generated")
+                            st.success(f"✓ {data['successful']}/{data['total']} reports generated — check the Stock Analysis page for full details.")
                             st.caption(f"Analysed: {', '.join(selected)}")
-                            for r in data["reports"]:
-                                with st.expander(f"{r.get('company_name', r['stock'])} — {r['stock']} {'✓' if r['status']=='success' else '✗'}"):
-                                    if r.get("current_price"):
-                                        st.metric("Price", f"{settings['currency_symbol']}{r['current_price']}")
-                                    if r.get("report"):
-                                        st.markdown(f'<div class="report-box">{r["report"]}</div>', unsafe_allow_html=True)
-                                    if r.get("error"):
-                                        st.error(r["error"])

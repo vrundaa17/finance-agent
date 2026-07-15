@@ -1,5 +1,6 @@
 import sys
-import os,datetime
+import os
+from datetime import datetime,timedelta
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -9,7 +10,7 @@ import pytz
 import agent.find as find
 from agent.analyse import build_graph
 import api.watchlist as watchlist
-from visualise import cleanup_charts
+from visualise import clear_all_charts
 from api.watchlist import cleanup_reports,cleanup_alerts
 import logging
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def run_daily_reports():
     
     
 def check_price_alerts():
-    now = datetime.datetime.now(IST)
+    now = datetime.now(IST)
     if not (9 <= now.hour < 15 or (now.hour == 15 and now.minute <= 30)):
         return
     if now.hour < 9 or (now.hour == 9 and now.minute < 15):
@@ -77,7 +78,7 @@ def check_price_alerts():
 
 
 def verify_prediction():
-    yesterday = (datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     unverified = [p for p in watchlist.get_predictions() if not p["actual_outcome"] and p["predicted_at"].startswith(yesterday[:7])]
     unique_stocks = list(set(p["stock_name"] for p in unverified))
     for stock in unique_stocks:
@@ -123,7 +124,7 @@ def start_scheduler():
         replace_existing=True,
     )
     scheduler.add_job(
-        cleanup_charts,
+        clear_all_charts,
         CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_charts",
         name="Clean Up Charts",

@@ -3,7 +3,7 @@ import api.watchlist as watchlist
 import api.schema as schema
 import asyncio,os
 import agent.find as find
-from visualise import generate_all_charts,cleanup_charts
+from visualise import generate_all_charts,clear_all_charts
 from agent.target import calculate_targets
 from agent.lstm import train_pred_lstm
 from api.routes.core_route import run_report
@@ -112,10 +112,10 @@ def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamental
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.delete("/charts/clear")
+@app.delete("/charts-clear")
 def clear_charts():
-    cleanup_charts()
-    return {"status": "cleared"}
+    deleted = clear_all_charts()
+    return {"status": "cleared", "deleted": deleted}
 
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
