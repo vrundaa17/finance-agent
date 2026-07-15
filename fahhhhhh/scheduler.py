@@ -145,7 +145,7 @@ def start_scheduler():
     )
     scheduler.add_job(
         watchlist.auto_verify_predictions,
-        CronTrigger(hour=0,minute=0,timezone=IST),
+        CronTrigger(hour=16,minute=30,timezone=IST),
         id="auto_verify_predictions",
         name="Verifing predictions",
         replace_existing=True,

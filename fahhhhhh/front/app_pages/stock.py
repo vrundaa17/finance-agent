@@ -2,6 +2,7 @@ import streamlit as st
 import api_client as api
 import logging
 logger = logging.getLogger(__name__)
+
 def stock_analysis():
     settings = st.session_state.get("settings", {
         "show_charts": True, "show_predictions": True,
