@@ -5,6 +5,7 @@ import asyncio,os
 import agent.find as find
 from visualise import generate_all_charts,cleanup_charts
 from agent.target import calculate_targets
+from agent.lstm import train_pred_lstm
 from api.routes.core_route import run_report
 from agent.predict import train_pred
 import logging
@@ -130,15 +131,28 @@ def get_targets(stock_name : str, period:str = "3mo"):
 
 
 @app.get("/predict/{stock_name}")
-def predict_stock(stock_name:str, period: str="3y"):
+def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):
     try:
         price_history = find.get_price_history(stock_name, period)
-        result = train_pred(price_history)
-        if not result.get("error"):
-            watchlist.save_prediction(stock_name,result["direction"],result["confidence"],result["accuracy"])
-        return result
+        index_history = find.get_price_history("^NSEI", period)
+        lstm_result = train_pred_lstm(price_history, index_history, horizon=horizon)
+        saved = watchlist.save_prediction(
+            stock_name=stock_name,
+            direction=lstm_result["direction"],
+            confidence=lstm_result["confidence"],
+            accuracy=lstm_result["bd_accuracy"],
+            predicted_price=lstm_result["predicted_price"],
+            current_price=lstm_result["current_price"],
+            horizon_days=lstm_result["horizon_days"],
+        )
+        return {
+            "stock": stock_name.upper(),
+            "current_price": price_history["close"][-1],
+            "prediction_id": saved["id"],
+            "lstm_prediction": lstm_result,
+        }
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Prediction failed for {stock_name}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
     
@@ -157,6 +171,10 @@ def verify_prediction(stock_name: str, date: str, actual: str):
 @app.delete("/predictions/clear")
 def clean_prediction():
     return watchlist.clear_predictions()
+
+@app.post("/predictions/verify/all")
+def verify_all_predictions():
+    return watchlist.auto_verify_predictions()
 
 # @app.post("/report/{stock_name}")
 # async def single_report(stock_name : str):

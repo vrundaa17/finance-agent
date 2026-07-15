@@ -3,6 +3,7 @@ import api.watchlist as watchlist
 import agent.find as find
 import asyncio,datetime
 from agent.analyse import build_graph
+from agent.lstm import train_pred_lstm
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,21 +17,44 @@ def init_graph():
     return graph
 
 
-async def run_report(stock_name: str):
+
+
+async def run_report(stock_name: str, horizon: int = 5):
     if watchlist.is_reported_today(stock_name):
         cached = watchlist.get_reports(stock_name)
         try:
             kyc = find.get_kyc_of_stock(stock_name)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        return {"fundamentals": kyc, "report": cached["report"], "charts": {}}
+        return {"fundamentals": kyc, "report": cached["report"],
+                "targets": cached.get("targets"), "lstm_prediction": cached.get("lstm_prediction"), "charts": {}}
 
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         None, lambda: graph.invoke({'stock_name': stock_name.upper()})
     )
+
+    lstm_result = None
+    if not result.get("error"):
+        try:
+            price_history = find.get_price_history(stock_name, "3y")
+            index_history = find.get_price_history("^NSEI", "3y")
+            lstm_result = await loop.run_in_executor(
+                None, lambda: train_pred_lstm(price_history, index_history, horizon=horizon)
+            )
+            watchlist.save_prediction(
+                stock_name=stock_name, direction=lstm_result["direction"],
+                confidence=lstm_result["confidence"], accuracy=lstm_result["bd_accuracy"],
+                predicted_price=lstm_result["predicted_price"], current_price=lstm_result["current_price"],
+                horizon_days=lstm_result["horizon_days"],
+            )
+        except Exception as e:
+            logger.error(f"LSTM failed for {stock_name}: {e}")
+
     if result.get("report"):
-        watchlist.report(stock_name, result["report"])
+        watchlist.report(stock_name, result["report"], targets=result.get("targets"), lstm_prediction=lstm_result)
+
+    result["lstm_prediction"] = lstm_result
     return result
 
 

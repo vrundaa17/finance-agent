@@ -18,9 +18,10 @@ def _extract_error(e,r=None):
 def api_get(path):
     
     try:
-        r = requests.get(BASE_URL + path, timeout=10)
+        r = requests.get(BASE_URL + path, timeout=120)
         r.raise_for_status()
         return r.json(), None
+    
     except requests.HTTPError as e:
         msg = _extract_error(e,r)
         logger.error(f"api_get Error {msg}")

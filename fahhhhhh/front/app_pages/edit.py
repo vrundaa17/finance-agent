@@ -2,6 +2,7 @@ import streamlit as st
 import logging
 import api_client as api
 import os
+import pandas as pd
 logger = logging.getLogger(__name__)
 
 def edit():
@@ -104,8 +105,10 @@ def edit():
         )
         if st.button("Verify All Pending Predictions Now"):
             result, err = api.api_post("/predictions/verify/all")
-            if err: st.error(err)
-            else:   st.success(f"Verified {result.get('verified', 0)} predictions")
+            if err:
+                st.error(err)
+            else:   
+                st.success(f"Verified {result.get('verified', 0)} predictions")
 
     st.divider()
 
@@ -128,35 +131,37 @@ def edit():
         m4.metric("Advisor Agreed",len(agrees))
 
         st.divider()
-
+        table_rows = []
         for p in preds[:20]:
-            c1, c2, c3, c4, c5, c6 = st.columns([2, 2, 1, 1, 1, 2])
-            c1.write(p["predicted_at"][:10])
-            c2.write(f"**{p['stock_name']}**")
-            c3.write(p["direction"])
-            c4.write(f"{p['confidence']}%")
-
-            if p.get("was_correct") == 1:
-                c5.success("✓")
-            elif p.get("was_correct") == 0:
-                c5.error("✗")
-            else:
-                c5.write("⏳")
-
-            if not p.get("human_flag"):
-                with c6:
-                    b1, b2, = st.columns(2)
-                    if b1.button("✔️", key=f"s_agree_{p['id']}"):
-                        api.api_post(f"/predictions/{p['id']}/feedback", params={"flag": "AGREE"})
-                        
-                        st.rerun()
-                    if b2.button("✖️", key=f"s_dis_{p['id']}"):
-                        api.api_post(f"/predictions/{p['id']}/feedback", params={"flag": "DISAGREE"})
-                        st.rerun()
-
-            else:
-                flag_emoji = {"AGREE": "✔️", "DISAGREE": "✖️"}.get(p["human_flag"], "")
-                c6.write(f"{flag_emoji} {p['human_flag']}")
+            table_rows.append({
+                "Date" : p["predicted_at"][:10],
+                "Stock" : p["stock_name"],
+                "Direction" : p["direction"],
+                "Confidence" : p["confidence"],
+                "Current ₹" : p.get("current_price","-"),
+                "Predicted ₹" : p.get("predicted_price","-"),
+                "Predict Days" : p.get("horizon_days","-"),
+                "Target Date" : p.get("target_date","-"),
+                "Actual ₹" : p.get("actual_price","-"),
+                "Result" : "✓" if p.get("was_correct") == 1 else ("✗" if p.get("was_correct") == 0 else "⏳"),
+                "Human" : p.get("human_flag","-"),
+            })
+        df = pd.DataFrame(table_rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        pending = [p for p in preds[:20] if not p.get("human_flag")]
+        if pending:
+            options = {f"{p['predicted_at'][:10]} — {p['stock_name']} ({p['direction']})": p["id"] for p in pending}
+            choice = st.selectbox("Select a prediction to review", list(options.keys()))
+            b1, b2 = st.columns(2)
+            if b1.button("Agree"):
+                api.api_post(f"/predictions/{options[choice]}/feedback", params={"flag": "AGREE"})
+                st.rerun()
+            if b2.button("Disagree"):
+                api.api_post(f"/predictions/{options[choice]}/feedback", params={"flag": "DISAGREE"})
+                st.rerun()
+        else:
+            st.caption("No prediction found here.")
+        
     else:
         st.info("No predictions yet. Run an analysis on the Stock Analysis page first.")
 

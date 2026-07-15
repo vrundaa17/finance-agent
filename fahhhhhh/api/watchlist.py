@@ -2,6 +2,7 @@ import agent.find as find
 import sqlite3,pytz
 from db import get_connection
 from datetime import datetime,timedelta
+import json
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -126,12 +127,14 @@ def get_stock(watchlist_name):
         logger.info(f"Fetched stocks in watchlist : {watchlist_name}")
         return [r["stock_name"] for r in rows]
 
-
-def report(stock_name,report):
+def report(stock_name, report, targets=None, lstm_prediction=None):
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO report (stock_name, report, generated_at) VALUES (?, ?, ?)",
-            (stock_name.upper(), report, datetime.now().isoformat())
+            "INSERT INTO report (stock_name, report, targets, lstm_prediction, generated_at) VALUES (?, ?, ?, ?, ?)",
+            (stock_name.upper(), report,
+             json.dumps(targets) if targets else None,
+             json.dumps(lstm_prediction) if lstm_prediction else None,
+             datetime.now().isoformat())
         )
         conn.commit()
         logger.info(f"Report added {stock_name}")
@@ -140,11 +143,18 @@ def report(stock_name,report):
 def get_reports(stock_name):
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT report, generated_at FROM report WHERE stock_name = ? ORDER BY generated_at DESC LIMIT 1",
+            "SELECT report, targets, lstm_prediction, generated_at FROM report WHERE stock_name = ? ORDER BY generated_at DESC LIMIT 1",
             (stock_name.upper(),)
         ).fetchone()
         logger.info(f"Fetched report for {stock_name}")
-        return dict(row) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        d["targets"] = json.loads(d["targets"]) if d.get("targets") else None
+        d["lstm_prediction"] = json.loads(d["lstm_prediction"]) if d.get("lstm_prediction") else None
+        return d
+
+
 
 
 def list_reports_today() -> list[dict]:
@@ -311,16 +321,29 @@ def cleanup_reports():
 
 
 #-----------------------------------------------------------------------------------------------------------------------------------------
-def save_prediction(stock_name: str, direction: str, confidence: float, accuracy: float) -> dict:
+def save_prediction(stock_name: str, direction: str, confidence: float, accuracy: float,predicted_price:float=None,current_price:float=None,horizon_days:int=None) -> dict:
+    target_date=None
+    if horizon_days:
+        d = datetime.now()
+        added=0
+        while added<horizon_days:
+            d+= timedelta(days=1)
+            if d.weekday()<5:
+                added+=1
+        target_date= d.strftime("%Y-%m-%d")
+            
+    
     with get_connection() as conn:
-        conn.execute(
+        cur = conn.execute(
             """ INSERT INTO predict_log
-            (stock_name, predicted_at, direction, confidence, accuracy)
-            VALUES (?, ?, ?, ?, ?)
-        """, (stock_name.upper(), datetime.now().isoformat(), direction, confidence, accuracy))
-        
+            (stock_name, predicted_at, direction, confidence, accuracy,
+             predicted_price, current_price, horizon_days, target_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (stock_name.upper(), datetime.now().isoformat(), direction, confidence,
+              accuracy if accuracy is not None else 0.0,
+              predicted_price, current_price, horizon_days, target_date))
         conn.commit()
-        return {"status": "saved", "stock": stock_name.upper(), "direction": direction}
+        return {"status": "saved", "stock": stock_name.upper(), "direction": direction,'id':cur.lastrowid}
 
 def get_predictions(stock_name: str = None) -> list[dict]:
     with get_connection() as conn:
@@ -385,3 +408,35 @@ def cleanup_old_predictions():
             WHERE predicted_at < datetime('now', '-5 days')
         """)
         conn.commit()
+        
+def auto_verify_predictions():
+    today = datetime.now()
+    with get_connection() as conn:
+        due = conn.execute(
+            """SELECT * from predict_log WHERE actual_outcome IS NULL AND target_data
+            IS NOT NULL AND target_date <= ?""",
+            (today,)
+        ).fetchall()
+    verified = 0
+    
+    for row in due:
+        try:
+            hist = find.get_price_history(row["stock_name"], "5d")
+            actual_price = float(hist["close"][-1])
+        except Exception as e:
+            logger.error(f"auto_verify failed for {row['stock_name']}: {e}")
+            continue
+        actual_direction="UP" if actual_price > row["current_price"] else "DOWN"
+            
+        was_correct = 1 if actual_direction == row["direction"] else 0
+
+        with get_connection() as conn:
+            conn.execute(
+                """UPDATE predict_log SET actual_outcome = ?, actual_price = ?, was_correct = ?
+                   WHERE id = ?""",
+                (actual_direction, actual_price, was_correct, row["id"])
+            )
+            conn.commit()
+        verified += 1
+    logger.info(f"[Scheduler] Auto-verified {verified} predictions")
+    return {"verified": verified}

@@ -12,11 +12,13 @@ def stock_analysis():
     st.markdown("## 💿 Stock Analysis")
     st.divider()
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2,col3= st.columns([3, 1,1])
     with col1:
         ticker = st.text_input("Stock ticker", placeholder="RELIANCE.NS, AAPL, TCS.NS, TSLA")
     with col2:
         period = st.selectbox("Period", ["1mo", "3mo", "6mo", "1y"], index=1)
+    with col3:
+        horizon = st.selectbox("Predict Days:",['1','5','21'],index=2)
 
     run_col, chart_col = st.columns(2)
     with run_col:
@@ -26,7 +28,7 @@ def stock_analysis():
 
     if run_report and ticker:
         
-        with st.spinner(f"🏁 Running multi-agent analysis for {ticker.upper()}... (15-30 sec)"):
+        with st.spinner(f"🏁 Running agent analysis for {ticker.upper()}... (15-30 sec)"):
             data, err = api.api_post("/report/watchlist", {"stock_name": [ticker.upper()]})
         if err:
             logger.error(f"Failed: {err}")
@@ -38,27 +40,29 @@ def stock_analysis():
             else:
                 if settings["show_predictions"]:
                     st.markdown('<div class="section-label">ML Prediction (Experimental)</div>', unsafe_allow_html=True)
-                    with st.spinner("Training model on price history..."):
-                        pred, perr = api.api_get(f"/predict/{ticker.upper()}?period={pred_settings['training_period']}")
+
+                    with st.spinner("Training models on price history..."):
+                        pred, perr = api.api_get(
+                            f"/predict/{ticker.upper()}?period={pred_settings['training_period']}&horizon={horizon}"
+                        )
 
                     if perr:
                         st.error(perr)
                     elif pred and not pred.get("error"):
-                        p1, p2, p3 = st.columns(3)
-                        p1.metric("Next Day Direction", pred["direction"])
-                        p2.metric("Confidence",f"{pred['confidence']}%")
-                        p3.metric("Backtest Accuracy",f"{pred['accuracy']}%")
+                        lstm = pred.get("lstm_prediction", {})
                         
-                        with st.expander("**Top signals used by model:**"):
-                            for sig in pred["top_signals"]:
-                                st.markdown(f"<h5>- {sig['feature']}  —  importance: {sig['importance']}</h5>",unsafe_allow_html=True)
-                        st.caption(f"⚠️ {pred['disclaimer']}")
-                    
+                        l1,l2,l3,l4= st.columns(4)
+                        l1.metric("Direction",lstm.get("direction","-"))
+                        l2.metric("Predicted Price",lstm.get("predicted_price","-"))
+                        l3.metric("Confidence",lstm.get("confidence","-"))
+                        l4.metric("Accuracy",lstm.get("bd_accuracy","-"))
+                        st.caption(f"ML prediction only. Not financial advice. Accuracy does not guarantee future results.")
                     st.divider()
                     
                     
+                    
                 if settings["show_targets"]:
-                    st.markdown('<div class="section-label">Buy / Sell Targets [Mathematically] </div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-label">Buy / Sell Targets [Mathematical] </div>', unsafe_allow_html=True)
                     with st.spinner("Mathematically Calculating level..."):
                         t,terr = api.api_get(f"/target/{ticker.upper()}?periods={period}")
                     
@@ -102,7 +106,7 @@ def stock_analysis():
                 st.divider()
                 st.success(f"✓ Analysis complete for {result.get('company_name', ticker)}")
                 f = result.get("fundamentals", {})
-                m1, m2, m3, m4, m5, m6 = st.columns(6)
+                m1, m2, m3, m4, m5, m6 = st.columns(6) 
                 m1.metric("Price", f"{settings['currency_symbol']}{result.get('current_price', '—')}")
                 m2.metric("P/E Ratio", f"{f.get('pe_ratio', '—'):.1f}" if f.get('pe_ratio') else "—")
                 m3.metric("EPS", f"{f.get('eps', '—')}")
@@ -154,13 +158,28 @@ def stock_analysis():
 
     today_data, _ = api.api_get("/report/today")
     today_reports = today_data.get("reports", []) if today_data else []
-
     with st.container(border=True):
-        st.markdown(f"**👍🏻 {len(today_reports)} stock(s) analysed today**")
-        if today_reports:
-            with st.expander("View list"):
+            with st.expander(f"**🆒 {len(today_reports)} {"stock" if len(today_reports)<=1 else "stocks"}  analysed today**"):
                 for r in today_reports:
-                    st.markdown(f"- **{r['stock_name']}** — {r['generated_at'][11:16]}")
-                    
-    st.divider()
+                    with st.expander(f"{r['stock_name']} — {r['generated_at'][11:16]}"):
+                        cached, cerr = api.api_get(f"/report/{r['stock_name']}/cached")
+                        if cerr:
+                            st.error(cerr)
+                        elif cached:
+                            if cached.get("lstm_prediction"):
+                                lstm = cached["lstm_prediction"]
+                                l1,l2,l3,l4 = st.columns(4)
+                                l1.metric("Direction", lstm.get("direction","-"))
+                                l2.metric("Predicted Price", lstm.get("predicted_price","-"))
+                                l3.metric("Confidence", lstm.get("confidence","-"))
+                                l4.metric("Accuracy", lstm.get("bd_accuracy","-"))
+                            if cached.get("targets"):
+                                t = cached["targets"]
+                                tc1,tc2,tc3 = st.columns(3)
+                                tc1.metric("Buy Target", f"{t['buy_target']['level']}" if t.get('buy_target') else "—")
+                                tc2.metric("Sell Target", f"{t['sell_target']['level']}" if t.get('sell_target') else "—")
+                                tc3.metric("Stop Loss", f"{t['stop_loss']['level']}" if t.get('stop_loss') else "—")
+                            st.markdown(f'<div class="report-box">{cached.get("report","")}</div>', unsafe_allow_html=True)
+                        
+            
     

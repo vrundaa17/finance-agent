@@ -35,9 +35,18 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stock_name TEXT NOT NULL,
                 report TEXT NOT NULL,
+                targets TEXT,
+                lstm_prediction TEXT,
                 generated_at TEXT NOT NULL
                 )"""
         )
+
+        existing_report_cols = {row["name"] for row in conn.execute("PRAGMA table_info(report)")}
+        for col in ("targets", "lstm_prediction"):
+            if col not in existing_report_cols:
+                conn.execute(f"ALTER TABLE report ADD COLUMN {col} TEXT")
+                
+                
         conn.execute(
             """ CREATE TABLE IF NOT EXISTS alert(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,11 +84,24 @@ def init_db():
                 direction TEXT NOT NULL,
                 confidence REAL NOT NULL,
                 accuracy REAL NOT NULL,
+                predicted_price REAL,
+                current_price REAL,
+                horizon_days INTEGER,
+                target_date TEXT,
                 actual_outcome TEXT,
+                actual_price REAL,
                 was_correct INTEGER,
                 human_flag TEXT,
                 human_note TEXT
             )
             """
         )
+        conn.commit()
+        
+        existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(predict_log)")}
+        for col, coltype in [("predicted_price","REAL"),("current_price","REAL"),
+                              ("horizon_days","INTEGER"),("target_date","TEXT"),
+                              ("actual_price","REAL")]:
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE predict_log ADD COLUMN {col} {coltype}")
         conn.commit()
