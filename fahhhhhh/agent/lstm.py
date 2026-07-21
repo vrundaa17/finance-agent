@@ -9,7 +9,7 @@ from agent.find import get_price_history
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from statsmodels.tsa.arima.model import ARIMA
+from collections import Counter
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -200,10 +200,30 @@ def dir_acc(df,cols,n_splits=3):
  
         direction_acc = (np.sign(preds_return) == np.sign(y_test_seq)).mean() * 100
         fold_accs.append(direction_acc)
+        print(f"fold {fold+1}: {direction_acc:.1f}%  (n={len(y_test_seq)})")
  
     return round(float(np.mean(fold_accs)), 1) if fold_accs else None
 
-
+def naive_momentum_acc(df, horizon, n_splits=3):
+    close = df["Close"].values
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    fold_accs = []
+    for fold, (train_idx, test_idx) in enumerate(tscv.split(close)):
+        correct, total = 0, 0
+        for i in test_idx:
+            if i - horizon < 0 or i + horizon >= len(close):
+                continue
+            past_return = close[i] - close[i - horizon]
+            actual_future_return = close[i + horizon] - close[i]
+            if past_return == 0:
+                continue
+            correct += int(np.sign(past_return) == np.sign(actual_future_return))
+            total += 1
+        if total > 0:
+            acc = correct / total * 100
+            fold_accs.append(acc)
+            print(f"  naive fold {fold+1}: {acc:.1f}%  (n={total})")
+    return round(float(np.mean(fold_accs)), 1) if fold_accs else None
 
 def train_pred_lstm(price_history:dict,index_history=None,horizon=1):
     closes = price_history.get("close")
@@ -221,21 +241,24 @@ def train_pred_lstm(price_history:dict,index_history=None,horizon=1):
         })
         
     df = feature(dates, closes, volumes, low, high, horizon, index_df)
-    cols = feature_cols.copy()
+    candidate_cols = feature_cols.copy()
     if 'relative_return_1d' in df.columns:
-        cols.append('relative_return_1d')
-    cols = select_features(df,cols) 
+        candidate_cols.append('relative_return_1d')
+
     df = df.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
- 
+
     if len(df) < window + 40:
         raise ValueError("Not enough history for a reliable LSTM forecast.")
-        
+
+    select_cutoff = int(len(df) * 0.8)
+    cols = select_features(df.iloc[:select_cutoff], candidate_cols)
+
     backtest_acc = dir_acc(df, cols)
     
     X_all = df[cols].values
     y_all = df["target"].values
     close_all = df["Close"].values
- 
+    
     scaler = StandardScaler().fit(X_all)
     X_scaled = scaler.transform(X_all)
     y_scaler = StandardScaler().fit(y_all.reshape(-1, 1))
@@ -257,13 +280,13 @@ def train_pred_lstm(price_history:dict,index_history=None,horizon=1):
     direction = "UP" if pred_return > 0 else "DOWN"
       
     seed_directions = [1 if p > 0 else -1 for p in seed_preds]
-    agreement = seed_directions.count(seed_directions[0]) / len(seed_directions)
-    confidence = round(agreement * 100, 1)
+    _, majority_count = Counter(seed_directions).most_common(1)[0]
+    confidence = round(majority_count / len(seed_directions) * 100, 1)
  
     return {
         "direction": direction,
         "predicted_return_pct": round(pred_return * 100, 2),
-        "current_price": true_current_price,
+        "analysis_price": true_current_price,
         "predicted_price": predicted_price,
         "confidence": confidence,
         "bd_accuracy": backtest_acc,
@@ -272,14 +295,17 @@ def train_pred_lstm(price_history:dict,index_history=None,horizon=1):
     }
 
 if __name__ == "__main__":
-    hist = get_price_history("RELIANCE.NS", "3y")
-    index_hist = get_price_history("^NSEI", "3y")
-    result = train_pred_lstm(hist, index_hist)
-    for i in (1,5,21):
-        result = train_pred_lstm(hist, index_hist, horizon=i)
-        print(f"\nHorizon : {i}")
-        for k, v in result.items():
-            print(k, ":", v)
+    stocks = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "ITC.NS", "LT.NS"]
+
+    for sname in stocks:
+        print(f"\n{sname}")
+        hist = get_price_history(sname, "3y")
+        index_hist = get_price_history("^NSEI", "3y")
+        result = train_pred_lstm(hist, index_hist, horizon=21)
+        print("model bd_accuracy:", result["bd_accuracy"])
+        df_check = feature(hist["dates"], hist["close"], hist["volume"], hist["low"], hist["high"], 21)
+        df_check = df_check.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
+        naive_momentum_acc(df_check, 21)
     
     
     

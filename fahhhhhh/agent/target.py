@@ -4,9 +4,9 @@ def find_local_extrema(prices: list[float], window: int = 5):
     resistance = []
 
     for i in range(window, len(prices) - window):
-        left  = prices[i - window: i]
-        right = prices[i + 1: i + window + 1]
-        price = prices[i]
+        left= prices[i - window: i]
+        right= prices[i + 1: i + window + 1]
+        price= prices[i]
 
         if all(price <= p for p in left) and all(price <= p for p in right):
             support.append(price)
@@ -18,7 +18,6 @@ def find_local_extrema(prices: list[float], window: int = 5):
 
 
 def cluster_levels(levels: list[float], tolerance: float = 0.015) -> list[dict]:
-
     if not levels:
         return []
 

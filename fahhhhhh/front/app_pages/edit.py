@@ -19,10 +19,22 @@ def edit():
             div[data-testid="column"] p { font-size: 20px; }
             div[data-testid="stCheckbox"] label p { font-size: 20px; }
             button[data-testid="baseButton-secondary"] p { font-size: 14px; }
+            label[data-testid="stWidgetLabel"] p { font-size: 20px; }
+            div[data-testid="column"] p { font-size: 20px; }
+
+            /* Prediction review table */
+            div[data-testid="stDataFrame"] div[role="gridcell"] {
+                font-size: 18px;
+            }
+
+            div[data-testid="stDataFrame"] div[role="columnheader"] {
+                font-size: 18px;
+                font-weight: bold;
+            }
         </style>
     """, unsafe_allow_html=True)
  
-
+   
     
     st.markdown("## 🪄 Edits")
     st.divider()
@@ -132,35 +144,78 @@ def edit():
 
         st.divider()
         table_rows = []
+
         for p in preds[:20]:
             table_rows.append({
-                "Date" : p["predicted_at"][:10],
-                "Stock" : p["stock_name"],
-                "Direction" : p["direction"],
-                "Confidence" : p["confidence"],
-                "Current ₹" : p.get("current_price","-"),
-                "Predicted ₹" : p.get("predicted_price","-"),
-                "Predict Days" : p.get("horizon_days","-"),
-                "Target Date" : p.get("target_date","-"),
-                "Actual ₹" : p.get("actual_price","-"),
-                "Result" : "✓" if p.get("was_correct") == 1 else ("✗" if p.get("was_correct") == 0 else "⏳"),
-                "Human" : p.get("human_flag","-"),
+                "Date": p["predicted_at"][:10],
+                "Stock": p["stock_name"],
+                "Direction": p["direction"],
+                "Confidence": p["confidence"],
+                "Analysis ₹": p.get("analysis_price", "-"),
+                "Predicted ₹": p.get("predicted_price", "-"),
+                "Predict Days": p.get("horizon_days", "-"),
+                "Target Date": p.get("target_date", "-"),
+                "Latest ₹": p.get("latest_price", "-"),
+                "Result": "✓" if p.get("was_correct") == 1 
+                        else ("✗" if p.get("was_correct") == 0 else "⏳"),
+                "Human": p.get("human_flag", "-"),
             })
+
         df = pd.DataFrame(table_rows)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        pending = [p for p in preds[:20] if not p.get("human_flag")]
-        if pending:
-            options = {f"{p['predicted_at'][:10]} — {p['stock_name']} ({p['direction']})": p["id"] for p in pending}
-            choice = st.selectbox("Select a prediction to review", list(options.keys()))
+
+        event = st.dataframe(
+            df.style.set_properties(
+        **{
+            "font-size": "18px",
+        }
+    ).set_table_styles(
+        [
+            {
+                "selector": "th",
+                "props": [
+                    ("font-size", "18px"),
+                    ("font-weight", "bold"),
+                ],
+            }
+        ]
+    ),
+    use_container_width=True,
+    hide_index=True,
+    selection_mode="single-row",
+    on_select="rerun",
+    height=600,
+)
+
+        selected = event.selection.rows
+
+        if selected:
+            selected_prediction = preds[selected[0]]
+
+            st.info(
+                f"""
+                    **Reviewing Prediction**
+                    **Stock:** {selected_prediction['stock_name']}
+                    """
+            )
+
             b1, b2 = st.columns(2)
+
             if b1.button("Agree"):
-                api.api_post(f"/predictions/{options[choice]}/feedback", params={"flag": "AGREE"})
+                api.api_post(
+                    f"/predictions/{selected_prediction['id']}/feedback",
+                    params={"flag": "AGREE"}
+                )
                 st.rerun()
+
             if b2.button("Disagree"):
-                api.api_post(f"/predictions/{options[choice]}/feedback", params={"flag": "DISAGREE"})
+                api.api_post(
+                    f"/predictions/{selected_prediction['id']}/feedback",
+                    params={"flag": "DISAGREE"}
+                )
                 st.rerun()
         else:
-            st.caption("No prediction found here.")
+            st.caption("Select the stock to **REVIEW**")
+
         
     else:
         st.info("No predictions yet. Run an analysis on the Stock Analysis page first.")

@@ -9,6 +9,15 @@ IST = pytz.timezone("Asia/Kolkata")
 import logging
 logger = logging.getLogger(__name__)
 
+
+def _today_ist():
+    return datetime.now(IST).strftime("%Y-%m-%d")
+
+def _now_is_ist():
+    return datetime.now(IST).isoformat()
+
+
+
 def create_watchlist(name ):
     with get_connection() as conn:
         try:
@@ -134,7 +143,7 @@ def report(stock_name, report, targets=None, lstm_prediction=None):
             (stock_name.upper(), report,
              json.dumps(targets) if targets else None,
              json.dumps(lstm_prediction) if lstm_prediction else None,
-             datetime.now().isoformat())
+             _now_is_ist())
         )
         conn.commit()
         logger.info(f"Report added {stock_name}")
@@ -159,7 +168,7 @@ def get_reports(stock_name):
 
 def list_reports_today() -> list[dict]:
     """Get all stocks that were analysed today"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _today_ist()
     with get_connection() as conn:
         rows = conn.execute(
             """SELECT stock_name, generated_at FROM report
@@ -303,13 +312,13 @@ def is_reported_today(stock_name: str) -> bool:
     if not latest:
         return False
     generated_date = latest["generated_at"][:10]  
-    today = datetime.now().strftime("%Y-%m-%d")
+    today =_today_ist()
     return generated_date == today
 
 
 def cleanup_reports():
     """Delete all reports not generated today"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _today_ist()
     with get_connection() as conn:
         deleted = conn.execute(
             "DELETE FROM report WHERE substr(generated_at, 1, 10) != ?",
@@ -321,7 +330,7 @@ def cleanup_reports():
 
 
 #-----------------------------------------------------------------------------------------------------------------------------------------
-def save_prediction(stock_name: str, direction: str, confidence: float, accuracy: float,predicted_price:float=None,current_price:float=None,horizon_days:int=None) -> dict:
+def save_prediction(stock_name: str, direction: str, confidence: float, accuracy: float,predicted_price:float=None,analysis_price:float=None,horizon_days:int=None) -> dict:
     target_date=None
     if horizon_days:
         d = datetime.now()
@@ -337,11 +346,11 @@ def save_prediction(stock_name: str, direction: str, confidence: float, accuracy
         cur = conn.execute(
             """ INSERT INTO predict_log
             (stock_name, predicted_at, direction, confidence, accuracy,
-             predicted_price, current_price, horizon_days, target_date)
+             predicted_price, analysis_price, horizon_days, target_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (stock_name.upper(), datetime.now().isoformat(), direction, confidence,
               accuracy if accuracy is not None else 0.0,
-              predicted_price, current_price, horizon_days, target_date))
+              predicted_price, analysis_price, horizon_days, target_date))
         conn.commit()
         return {"status": "saved", "stock": stock_name.upper(), "direction": direction,'id':cur.lastrowid}
 
@@ -409,34 +418,56 @@ def cleanup_old_predictions():
         """)
         conn.commit()
         
+        
 def auto_verify_predictions():
-    today = datetime.now()
-    with get_connection() as conn:
-        due = conn.execute(
-            """SELECT * from predict_log WHERE actual_outcome IS NULL AND target_data
-            IS NOT NULL AND target_date <= ?""",
-            (today,)
-        ).fetchall()
+    today = datetime.now().date()
+    updated = 0
     verified = 0
-    
-    for row in due:
+
+    #pending 
+    with get_connection() as conn:
+        predictions = conn.execute(
+            """SELECT *FROM predict_log WHERE actual_outcome IS NULL AND target_date IS NOT NULL """
+        ).fetchall()
+
+    for row in predictions:
         try:
             hist = find.get_price_history(row["stock_name"], "5d")
-            actual_price = float(hist["close"][-1])
+            latest_price = float(hist["close"][-1])
         except Exception as e:
-            logger.error(f"auto_verify failed for {row['stock_name']}: {e}")
+            logger.error(f"Price fetch failed for {row['stock_name']}: {e}")
             continue
-        actual_direction="UP" if actual_price > row["current_price"] else "DOWN"
-            
-        was_correct = 1 if actual_direction == row["direction"] else 0
 
         with get_connection() as conn:
+            conn.execute(""" UPDATE predict_log SET latest_price = ? WHERE id = ?""",(latest_price,row["id"]))
+            conn.commit()
+
+        updated += 1
+        target_date = datetime.strptime(str(row["target_date"]), "%Y-%m-%d").date()
+        if today < target_date:
+            logger.info(f"Tracking {row['stock_name']}: current={latest_price}, "
+                f"target={target_date}, status=PENDING")
+            continue
+        
+        if latest_price > float(row["analysis_price"]):
+            actual_direction = "UP"
+        else:
+            actual_direction = "DOWN"
+        was_correct = (1 if actual_direction == row["direction"] else 0 )
+        
+        with get_connection() as conn:
             conn.execute(
-                """UPDATE predict_log SET actual_outcome = ?, actual_price = ?, was_correct = ?
-                   WHERE id = ?""",
-                (actual_direction, actual_price, was_correct, row["id"])
+                """UPDATE predict_log SET actual_outcome = ?, latest_price = ?, was_correct = ? WHERE id = ?
+                """,( actual_direction, latest_price, was_correct, row["id"] )
             )
             conn.commit()
         verified += 1
-    logger.info(f"[Scheduler] Auto-verified {verified} predictions")
-    return {"verified": verified}
+        logger.info(
+            f"Verified {row['stock_name']}: "
+            f"prediction={row['direction']} "
+            f"actual={actual_direction} "
+            f"correct={was_correct}"
+        )
+
+    logger.info(f"[Scheduler] Updated prices: {updated}, Verified predictions: {verified}")
+    return {"updated": updated,"verified": verified}

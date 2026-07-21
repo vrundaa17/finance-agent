@@ -135,7 +135,7 @@ def train_pred(price_history:dict):
     
 def val(sname, period="3y", n_splits=3):
     hist =get_price_history(sname, period)
-    df = feature(hist["close"], hist["volume"], hist["low"], hist["high"])
+    df = feature(hist['dates'],hist["close"], hist["volume"], hist["low"], hist["high"])
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
     feature_cols = ["return_1d", "return_5d", "return_10d", "price_ma20", "ATR", "RSI", "MACD", "volume_vs_ma", "bb_width"]
@@ -189,8 +189,9 @@ def val(sname, period="3y", n_splits=3):
     # return results
 
 if __name__ == "__main__":
+    
+    stock= yf.Ticker("RELIANCE.NS")
     val("RELIANCE.NS")
-#     stock= yf.Ticker("TATAPOWER.NS")
 #     # hist = stock.history(period="3y")
 #     from find import get_price_history
 #     hist = get_price_history("TATAPOWER.NS","3y")

@@ -6,12 +6,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import yfinance as yf
-import pytz
+import pytz,asyncio
 import agent.find as find
 from agent.analyse import build_graph
 import api.watchlist as watchlist
 from visualise import clear_all_charts
 from api.watchlist import cleanup_reports,cleanup_alerts
+from cache import set_job_state,r
+from celery_app import celery_app
 import logging
 logger = logging.getLogger(__name__)
 
@@ -19,16 +21,17 @@ IST = pytz.timezone("Asia/Kolkata")
 graph = build_graph()
 
 
-def run_daily_reports():
+
+
+async def _run_daily_reports_async():
     print("[Scheduler] running daily rep")
     watchlists = watchlist.list_watchlist()
-
-    for wl in watchlists:
-        tickers = watchlist.get_stock(wl["name"])
-        for stock in tickers:
+    semaphore = asyncio.Semaphore(5)
+    async def _process_stock(stock):
+        async with semaphore:
             try:
-                print(f"[Scheduler] Generating report for {stock}...")
-                result = graph.invoke({"stock_name": stock})
+                logger.info(f"[Scheduler] Generating report for {stock}...")
+                result = await graph.ainvoke({"stock_name": stock})
                 if result.get("report"):
                     watchlist.report(stock,result['report'])
                     logger.info(f"[Scheduler]  {stock} report found")
@@ -36,7 +39,24 @@ def run_daily_reports():
                     logger.error(f"[Scheduler] X {stock} failed : {result.get('error')}")
             except Exception as e:
                 logger.error(f"[Scheduler] X {stock} - Exception : {e}")
+    tasks=[
+        _process_stock(stock)
+        for wl in watchlists
+        for stock in watchlist.get_stock(wl['name'])
+    ]
+    await asyncio.gather(*tasks)
     logger.info("[Scheduler] Daily reports done")
+
+@celery_app.task
+def run_daily_reports_task():
+    logger.info("[Celery] running daily reports")
+    asyncio.run(_run_daily_reports_async())
+    r.publish("reports", "daily_reports_done")
+    
+    
+def run_daily_reports():
+    logger.info("[Scheduler] running daily rep")
+    run_daily_reports_task.delay()
     
     
 def check_price_alerts():
@@ -45,6 +65,7 @@ def check_price_alerts():
         return
     if now.hour < 9 or (now.hour == 9 and now.minute < 15):
         return
+    set_job_state("price_alerts", "running")
     alerts = watchlist.get_active_alerts()
     if not alerts:
         return
@@ -75,12 +96,16 @@ def check_price_alerts():
             watchlist.mark_alert_triggered(alert['id'],price)
             logger.info(f"[ALERT] TRIGGERED : {stock} is {price}")
             logger.info(f"({alert['condition']} {alert['threshold']})")
+    set_job_state("price_alerts", "done")
 
 
 def verify_prediction():
+    set_job_state("verify_prediction", "running")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     unverified = [p for p in watchlist.get_predictions() if not p["actual_outcome"] and p["predicted_at"].startswith(yesterday[:7])]
     unique_stocks = list(set(p["stock_name"] for p in unverified))
+
+    failed = []
     for stock in unique_stocks:
         try:
             history = find.get_price_history(stock, "5d")
@@ -91,13 +116,21 @@ def verify_prediction():
                 print(f"[Scheduler] Verified {stock}: {actual}")
         except Exception as e:
             print(f"[Scheduler] Could not verify {stock}: {e}")
+            failed.append(stock)
 
+    if failed:
+        set_job_state("verify_prediction",f"done_with_errors : {",".join(failed)}")
+    else:
+        set_job_state("verify_prediction", "done")
+
+
+# BackgroundScheduler runs jobs in worker threads, not in FastAPI event loop 
 
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=IST)
     scheduler.add_job(
         run_daily_reports,
-        CronTrigger(hour=9, minute=15, timezone=IST),
+        CronTrigger(hour=11, minute=6, timezone=IST),
         id="daily_reports",
         name="Daily market reports",
         replace_existing=True,
@@ -146,7 +179,7 @@ def start_scheduler():
     )
     scheduler.add_job(
         watchlist.auto_verify_predictions,
-        CronTrigger(hour=16,minute=30,timezone=IST),
+        CronTrigger(hour=18,minute=28,timezone=IST),
         id="auto_verify_predictions",
         name="Verifing predictions",
         replace_existing=True,

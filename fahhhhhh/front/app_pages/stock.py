@@ -31,7 +31,7 @@ def stock_analysis():
         
         with st.spinner(f"🏁 Running agent analysis for {ticker.upper()}... (15-30 sec)"):
             data, err = api.api_post("/report/watchlist", {"stock_name": [ticker.upper()]})
-        if err:
+        if err: 
             logger.error(f"Failed: {err}")
             st.error(err)
         elif data and data.get("reports"):
@@ -169,7 +169,7 @@ def stock_analysis():
                         elif cached:
                             if cached.get("lstm_prediction"):
                                 lstm = cached["lstm_prediction"]
-                                l1,l2,l3,l4 = st.columns(4)
+                                l1,l2,l3,l4 = st.columns(4) 
                                 l1.metric("Direction", lstm.get("direction","-"))
                                 l2.metric("Predicted Price", lstm.get("predicted_price","-"))
                                 l3.metric("Confidence", lstm.get("confidence","-"))

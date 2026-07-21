@@ -25,7 +25,7 @@ async def watchlist_report(request : schema.WatchlistReportRequest):
                 reports.append({
                     "stock": stock.upper(),
                     "company_name": None,
-                    "current_price": None,
+                    "analysis_price": None,
                     "fundamentals": {},
                     "report": None,
                     "target" : None,
@@ -36,7 +36,7 @@ async def watchlist_report(request : schema.WatchlistReportRequest):
             reports.append({
                 "stock": stock.upper(),
                 "company_name": result.get("fundamentals", {}).get("company_name"),
-                "current_price": result.get("fundamentals", {}).get("current_price"),
+                "analysis_price": result.get("fundamentals", {}).get("current_price"),
                 "fundamentals": result.get("fundamentals", {}),
                 "report": result.get("report"),
                 "targets": result.get("targets", {}),
@@ -142,12 +142,12 @@ def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):
             confidence=lstm_result["confidence"],
             accuracy=lstm_result["bd_accuracy"],
             predicted_price=lstm_result["predicted_price"],
-            current_price=lstm_result["current_price"],
+            analysis_price=lstm_result["analysis_price"],
             horizon_days=lstm_result["horizon_days"],
         )
         return {
             "stock": stock_name.upper(),
-            "current_price": price_history["close"][-1],
+            "analysis_price": price_history["close"][-1],
             "prediction_id": saved["id"],
             "lstm_prediction": lstm_result,
         }

@@ -4,13 +4,13 @@ import agent.find as find
 import asyncio,datetime
 from agent.analyse import build_graph
 from agent.lstm import train_pred_lstm
-import logging
+import logging,json
 logger = logging.getLogger(__name__)
-
+from cache import r
 app = APIRouter(tags=['core'])
 graph= None
-import logging
-logger = logging.getLogger(__name__)
+
+
 def init_graph():
     global graph
     graph = build_graph()
@@ -20,6 +20,7 @@ def init_graph():
 
 
 async def run_report(stock_name: str, horizon: int = 5):
+    
     if watchlist.is_reported_today(stock_name):
         cached = watchlist.get_reports(stock_name)
         try:
@@ -28,7 +29,7 @@ async def run_report(stock_name: str, horizon: int = 5):
             raise HTTPException(status_code=400, detail=str(e))
         return {"fundamentals": kyc, "report": cached["report"],
                 "targets": cached.get("targets"), "lstm_prediction": cached.get("lstm_prediction"), "charts": {}}
-
+    
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         None, lambda: graph.invoke({'stock_name': stock_name.upper()})
@@ -39,9 +40,16 @@ async def run_report(stock_name: str, horizon: int = 5):
         try:
             price_history = find.get_price_history(stock_name, "3y")
             index_history = find.get_price_history("^NSEI", "3y")
-            lstm_result = await loop.run_in_executor(
-                None, lambda: train_pred_lstm(price_history, index_history, horizon=horizon)
-            )
+            
+            lstm_key = f"lstm:{stock_name.upper()}:{horizon}"
+            lstm_cached = r.get(lstm_key)
+            if lstm_cached:
+                lstm_result = json.loads(lstm_cached)
+            else:
+                lstm_result = await loop.run_in_executor(
+                    None, lambda: train_pred_lstm(price_history, index_history, horizon=horizon)
+                )
+                r.set(lstm_key,json.dumps(lstm_result),ex=3600)
             watchlist.save_prediction(
                 stock_name=stock_name, direction=lstm_result["direction"],
                 confidence=lstm_result["confidence"], accuracy=lstm_result["bd_accuracy"],
@@ -65,30 +73,36 @@ def health():
 
 
 @app.get("/quotes")
-def get_quotes(tickers: str):
+async def get_quotes(tickers: str):
     """Get live price + change for multiple stocks """
     symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-    quotes = []
-    for sym in symbols:
-        try:
-            data = find.get_kyc_of_stock(sym)
-            price = data.get("current_price")
-            prev = data.get("previous_close")
-            change = round(price - prev, 2) if price and prev else None
-            change_pct = round((change / prev) * 100, 2) if change and prev else None
-            quotes.append({
-                "stock_name": sym,
-                "company_name": data.get("company_name"),
-                "current_price": price,
-                "change": change,
-                "change_pct": change_pct,
-            })
+    semaphore = asyncio.Semaphore(5)
+    loop = asyncio.get_event_loop()
     
-        except Exception as e:
-            logger.error("Error while fetching live stock...")
-            quotes.append({"stock_name": sym, "error": str(e)})
+    # quotes = []
+    async def fetch_one(sym):
+        async with semaphore:
+            try:
+                data = await loop.run_in_executor(None, find.get_kyc_of_stock ,sym)
+                price = data.get("current_price")
+                prev = data.get("previous_close")
+                change = round(price - prev, 2) if price and prev else None
+                change_pct = round((change / prev) * 100, 2) if change and prev else None
+                return {
+                    "stock_name": sym,
+                    "company_name": data.get("company_name"),
+                    "current_price": price,
+                    "change": change,
+                    "change_pct": change_pct,
+            }
+    
+            except Exception as e:
+                logger.error("Error while fetching live stock...")
+                return {"stock_name": sym, "error": str(e)}
+            
+    quote = await asyncio.gather(*(fetch_one(sym) for sym in symbols))
     logger.info("Live stocks fetched...")
-    return {"quotes": quotes}
+    return {"quotes": quote}
 
 
 @app.get("/news")

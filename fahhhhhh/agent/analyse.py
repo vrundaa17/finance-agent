@@ -8,13 +8,14 @@ from agent.target import calculate_targets
 from agent.find import get_kyc_of_stock, get_price_history, get_news_by_stock, get_news_finnhub
 from dotenv import load_dotenv
 import statistics
+from cache import r, cached_llm_call
 import logging
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 llm = ChatGroq(model="llama-3.3-70b-versatile",)
-
+    
 def fetch_fundamentals(state:AgentState):
     try:
         fundamentals = get_kyc_of_stock(state['stock_name'])
@@ -70,9 +71,9 @@ def analyse_fundamental(state:AgentState):
         Write your analysis in plain English, no bullet points.
     """
     
-    response = llm.invoke(prompt)
+    content = cached_llm_call("fundamental",llm,prompt)
     logger.info(f"Analysed Fundamentals {state['stock_name']}")
-    return{**state, "analysis_fundamentals":response.content}
+    return{**state, "analysis_fundamentals":content}
 
 
 
@@ -97,9 +98,9 @@ def analyse_news(state: AgentState):
         
         Write in plain English, no bullet points."""
  
-    response = llm.invoke(prompt)
+    content = cached_llm_call("news",llm,prompt)
     logger.info(f"Analysed News : {state['stock_name']}")
-    return {**state, "analysis_news": response.content}
+    return {**state, "analysis_news": content}
  
       
 def analyse_risk(state:AgentState):
@@ -132,9 +133,9 @@ def analyse_risk(state:AgentState):
         Write in plain English, no bullet points.
     """
     
-    response = llm.invoke(prompt)
+    content = cached_llm_call("risk",llm,prompt)
     logger.info(f"Analysed Risk : {state['stock_name']}")
-    return {**state, "analysis_risk": response.content}
+    return {**state, "analysis_risk": content}
 
 
 def compile_report(state:AgentState):
@@ -164,9 +165,9 @@ def compile_report(state:AgentState):
         The risk assessment is a must. Be realistic about it not assumption.
         Start with the company name and current price. End with the risk disclaimer."""
     
-    response = llm.invoke(prompt)
+    content = cached_llm_call("report",llm,prompt)
     logger.info(f"Report compiled : {state['stock_name']}")
-    return {**state, "report": response.content}
+    return {**state, "report": content}
 
 
 
@@ -281,7 +282,7 @@ def analyse_targets(state: AgentState):
     if not articles:
         return "analyse_risk"
     return "analyse_news"
-        
+    
         
         
 def build_graph():

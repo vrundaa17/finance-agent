@@ -1,6 +1,7 @@
 import sqlite3
 import os
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "db", "watchlist.db")
+from config import settings
+DB_PATH = settings.db_path
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -85,23 +86,39 @@ def init_db():
                 confidence REAL NOT NULL,
                 accuracy REAL NOT NULL,
                 predicted_price REAL,
-                current_price REAL,
+                analysis_price REAL,
                 horizon_days INTEGER,
                 target_date TEXT,
                 actual_outcome TEXT,
-                actual_price REAL,
+                latest_price REAL,
                 was_correct INTEGER,
                 human_flag TEXT,
                 human_note TEXT
             )
             """
         )
-        conn.commit()
         
         existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(predict_log)")}
-        for col, coltype in [("predicted_price","REAL"),("current_price","REAL"),
-                              ("horizon_days","INTEGER"),("target_date","TEXT"),
-                              ("actual_price","REAL")]:
+                
+        if "current_price" in existing_cols and "analysis_price" not in existing_cols:
+            conn.execute("""ALTER TABLE predict_log RENAME COLUMN current_price TO analysis_price""")
+
+        if "actual_price" in existing_cols and "latest_price" not in existing_cols:
+            conn.execute("""ALTER TABLE predict_log RENAME COLUMN actual_price TO latest_price""")
+            
+        for col, coltype in [
+            ("predicted_price", "REAL"),
+            ("analysis_price", "REAL"),
+            ("horizon_days", "INTEGER"),
+            ("target_date", "TEXT"),
+            ("latest_price", "REAL")
+        ]:
             if col not in existing_cols:
-                conn.execute(f"ALTER TABLE predict_log ADD COLUMN {col} {coltype}")
+                conn.execute(
+                    f"ALTER TABLE predict_log ADD COLUMN {col} {coltype}"
+        )  
         conn.commit()
+
+        
+        #current price - price when the stock was analysed
+        #actual price - everyday price at the end of the market.
