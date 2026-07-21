@@ -8,6 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score,precision_score,recall_score
+import logging
+logger = logging.getLogger(__name__)
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -164,7 +166,7 @@ def val(sname, period="3y", n_splits=3):
         # )
         # model.fit(X_train, y_train)
         preds = model.predict(X_test)
-        print(f"predicted class counts: {pd.Series(preds).value_counts().to_dict()}")
+        logger.info(f"predicted class counts: {pd.Series(preds).value_counts().to_dict()}")
         train_preds = model.predict(X_train)
         test_preds = model.predict(X_test)
 
@@ -179,7 +181,7 @@ def val(sname, period="3y", n_splits=3):
         # prec_down = round(precision_score(y_test,preds,pos_label=0,zero_division=0) *100,1)
         # rec_down = round(recall_score(y_test,preds,pos_label=0,zero_division=0)*100,1)
         
-        print(f"fold {fold+1}: train={len(X_train)} test={len(X_test)}  "
+        logger.info(f"fold {fold+1}: train={len(X_train)} test={len(X_test)}  "
               f"train_acc={train_acc}%  test_acc={test_acc}%  baseline={baseline}%  "
               f"gap={round(train_acc - test_acc, 1)}")
 

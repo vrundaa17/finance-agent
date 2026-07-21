@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException
-import api.watchlist as watchlist
+import api.db.alert_db as watchlist
 from api.schema import AlertCreate
-
+import utils
 app = APIRouter(tags=['Alert'])
 
 @app.post("/alerts")
 def create_alert(request :AlertCreate ):
     """Add a new alert"""
-    result = watchlist.add_alert(request.stock_name,request.condition,request.threshold,
+    stock_name = utils._normalise_stock(request.stock_name)
+    result = watchlist.add_alert(stock_name,request.condition,request.threshold,
         request.is_persistent,request.expire_days)
     
     if result.get("status") == "invalid":
@@ -42,5 +43,5 @@ def delete_alert(alert_id: int):
 def clean_alerts():
     result = watchlist.cleanup_alerts()
     if result.get("status")=="error":
-        raise HTTPException(status_code = 404, dettail="Nothing Cleared")
+        raise HTTPException(status_code = 404, detail="Nothing Cleared")
     return {"status":"cleared"}

@@ -1,7 +1,9 @@
 import sqlite3
 import os
-from config import settings
+from core.config import settings
 DB_PATH = settings.db_path
+
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -122,3 +124,12 @@ def init_db():
         
         #current price - price when the stock was analysed
         #actual price - everyday price at the end of the market.
+        
+        
+def check_db_health():
+    try:
+        with get_connection() as conn:
+            conn.execute("SELECT 1")
+        return True
+    except Exception :
+        return False

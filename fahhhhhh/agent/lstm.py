@@ -10,6 +10,8 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from collections import Counter
+import logging
+logger = logging.getLogger(__name__)
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -200,7 +202,7 @@ def dir_acc(df,cols,n_splits=3):
  
         direction_acc = (np.sign(preds_return) == np.sign(y_test_seq)).mean() * 100
         fold_accs.append(direction_acc)
-        print(f"fold {fold+1}: {direction_acc:.1f}%  (n={len(y_test_seq)})")
+        logger.info(f"fold {fold+1}: {direction_acc:.1f}%  (n={len(y_test_seq)})")
  
     return round(float(np.mean(fold_accs)), 1) if fold_accs else None
 
@@ -222,7 +224,7 @@ def naive_momentum_acc(df, horizon, n_splits=3):
         if total > 0:
             acc = correct / total * 100
             fold_accs.append(acc)
-            print(f"  naive fold {fold+1}: {acc:.1f}%  (n={total})")
+            logger.info(f"  naive fold {fold+1}: {acc:.1f}%  (n={total})")
     return round(float(np.mean(fold_accs)), 1) if fold_accs else None
 
 def train_pred_lstm(price_history:dict,index_history=None,horizon=1):
@@ -298,11 +300,11 @@ if __name__ == "__main__":
     stocks = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "ITC.NS", "LT.NS"]
 
     for sname in stocks:
-        print(f"\n{sname}")
+        logger.info(f"\n{sname}")
         hist = get_price_history(sname, "3y")
         index_hist = get_price_history("^NSEI", "3y")
         result = train_pred_lstm(hist, index_hist, horizon=21)
-        print("model bd_accuracy:", result["bd_accuracy"])
+        logger.info("model bd_accuracy:", result["bd_accuracy"])
         df_check = feature(hist["dates"], hist["close"], hist["volume"], hist["low"], hist["high"], 21)
         df_check = df_check.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
         naive_momentum_acc(df_check, 21)
@@ -327,12 +329,12 @@ if __name__ == "__main__":
 #     horizon_labels = {1: "1-day", 5: "5-day (weekly)", 21: "21-day (~monthly)"}
 
 #     for horizon in horizons:
-#         print(horizon)
+#         logger.info(horizon)
 #         results = run_horizon(sname, horizon, hist, index_df)
 #         for r in results:
-#             print(f"fold {r['fold']}: test_mse={r['test_mse']:.2f}  naive_mse={r['naive_mse']:.2f}  "
+#             logger.info(f"fold {r['fold']}: test_mse={r['test_mse']:.2f}  naive_mse={r['naive_mse']:.2f}  "
 #                   f"direction_acc={r['direction_acc']:.1f}%")
 
 #         avg_direction = np.mean([r["direction_acc"] for r in results])
         
-#         print(f"LSTM direction_acc: {avg_direction:.1f}% ")    
+#         logger.info(f"LSTM direction_acc: {avg_direction:.1f}% ")    

@@ -8,44 +8,50 @@ from apscheduler.triggers.interval import IntervalTrigger
 import yfinance as yf
 import pytz,asyncio
 import agent.find as find
-from agent.analyse import build_graph
-import api.watchlist as watchlist
-from visualise import clear_all_charts
-from api.watchlist import cleanup_reports,cleanup_alerts
+
+from api.routes.core_route import run_report
+import api.db.report_db as report_watchlist
+import api.db.alert_db as alert_watchlist
+import api.db.predict_db as edit_watchlist
+
+from core.visualise import clear_all_charts
+
 from cache import set_job_state,r
 from celery_app import celery_app
 import logging
 logger = logging.getLogger(__name__)
 
 IST = pytz.timezone("Asia/Kolkata")
-graph = build_graph()
-
 
 
 
 async def _run_daily_reports_async():
-    print("[Scheduler] running daily rep")
-    watchlists = watchlist.list_watchlist()
+    logger.info("[Scheduler] running daily rep")
+    watchlists = report_watchlist.list_watchlist()
     semaphore = asyncio.Semaphore(5)
     async def _process_stock(stock):
         async with semaphore:
+            if report_watchlist.is_reported_today(stock):
+                logger.info(f"[Scheduler] {stock} already reported today, skipping ")
+                return
             try:
                 logger.info(f"[Scheduler] Generating report for {stock}...")
-                result = await graph.ainvoke({"stock_name": stock})
+                result = await run_report(stock)
                 if result.get("report"):
-                    watchlist.report(stock,result['report'])
-                    logger.info(f"[Scheduler]  {stock} report found")
+                    logger.info(f"[Scheduler] {stock} report found")
                 else:
-                    logger.error(f"[Scheduler] X {stock} failed : {result.get('error')}")
+                    logger.info(f"[Scheduler] {stock} report failed : {result.get('error')}")
             except Exception as e:
-                logger.error(f"[Scheduler] X {stock} - Exception : {e}")
+                logger.error(f"[Scheduler] Exxeption {e}")
     tasks=[
         _process_stock(stock)
         for wl in watchlists
-        for stock in watchlist.get_stock(wl['name'])
+        for stock in report_watchlist.get_stock(wl['name'])
     ]
     await asyncio.gather(*tasks)
     logger.info("[Scheduler] Daily reports done")
+
+
 
 @celery_app.task
 def run_daily_reports_task():
@@ -66,7 +72,7 @@ def check_price_alerts():
     if now.hour < 9 or (now.hour == 9 and now.minute < 15):
         return
     set_job_state("price_alerts", "running")
-    alerts = watchlist.get_active_alerts()
+    alerts = alert_watchlist.get_active_alerts()
     if not alerts:
         return
     stocks = list(set(a["stock_name"]for a in alerts))
@@ -93,35 +99,11 @@ def check_price_alerts():
             triggered = True
             
         if triggered:
-            watchlist.mark_alert_triggered(alert['id'],price)
+            alert_watchlist.mark_alert_triggered(alert['id'],price)
             logger.info(f"[ALERT] TRIGGERED : {stock} is {price}")
             logger.info(f"({alert['condition']} {alert['threshold']})")
     set_job_state("price_alerts", "done")
 
-
-def verify_prediction():
-    set_job_state("verify_prediction", "running")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    unverified = [p for p in watchlist.get_predictions() if not p["actual_outcome"] and p["predicted_at"].startswith(yesterday[:7])]
-    unique_stocks = list(set(p["stock_name"] for p in unverified))
-
-    failed = []
-    for stock in unique_stocks:
-        try:
-            history = find.get_price_history(stock, "5d")
-            closes = history["close"]
-            if len(closes) >= 2:
-                actual = "UP" if closes[-1] > closes[-2] else "DOWN"
-                watchlist.update_actual_outcome(stock, yesterday, actual)
-                print(f"[Scheduler] Verified {stock}: {actual}")
-        except Exception as e:
-            print(f"[Scheduler] Could not verify {stock}: {e}")
-            failed.append(stock)
-
-    if failed:
-        set_job_state("verify_prediction",f"done_with_errors : {",".join(failed)}")
-    else:
-        set_job_state("verify_prediction", "done")
 
 
 # BackgroundScheduler runs jobs in worker threads, not in FastAPI event loop 
@@ -143,14 +125,14 @@ def start_scheduler():
         replace_existing=True
     )
     scheduler.add_job(
-        cleanup_reports,
+        report_watchlist.cleanup_reports,
         CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_reports",
         name="Clean Up Expired Reports",
         replace_existing=True,
     )
     scheduler.add_job(
-        cleanup_alerts,
+        alert_watchlist.cleanup_alerts,
         CronTrigger(hour=12,minute=0,timezone=IST),
         id="cleanup_alerts",
         name="Clean Up Expired Alert",
@@ -164,22 +146,8 @@ def start_scheduler():
         replace_existing=True,
     )
     scheduler.add_job(
-        verify_prediction,
-        CronTrigger(hour=12, minute=0, timezone=IST),
-        id="verify_predictions",
-        name="Verify yesterday predictions",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        watchlist.cleanup_old_predictions,
-        CronTrigger(hour=0,minute=0,timezone=IST),
-        id="cleanup_old_predictions",
-        name="Clean Up Old predictions",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        watchlist.auto_verify_predictions,
-        CronTrigger(hour=18,minute=28,timezone=IST),
+        edit_watchlist.auto_verify_predictions,
+        CronTrigger(hour=14,minute=00,timezone=IST),
         id="auto_verify_predictions",
         name="Verifing predictions",
         replace_existing=True,

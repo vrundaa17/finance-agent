@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
-import api.watchlist as watchlist
+import api.db.report_db as watchlist
 import api.schema as schema
+import utils
 app= APIRouter(tags=['Watchlist'])
 
 
@@ -27,14 +28,17 @@ def get_stock_watchlist(watchlist_name: str):
     return {"watchlist": watchlist_name, "stock_name": stock_name}
 
 @app.post("/watchlists/add")
-def add_to_watchlist(body:schema.StockAdd):
-    """Add stocks to the watchlist"""
-    result =  watchlist.add_stock(body.watchlist_name,body.stock_name,body.notes or None)
-    if result.get("status") == "closed":
-        raise HTTPException(status_code=400, detail=result["message"])
-    if result.get("status")== "exists":
+def add_to_watchlist(body: schema.StockAdd):
+    stock_name = utils._normalise_stock(body.stock_name)
+    result = watchlist.add_stock(body.watchlist_name, stock_name, body.notes or None)
+    if result.get("status") == "invalid":
+        raise HTTPException(status_code=429, detail=result["message"])
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result["message"])
+    if result.get("status") == "exists":
         raise HTTPException(status_code=400, detail=f"'{body.stock_name}' is already in '{body.watchlist_name}'")
     return result
+
 
 @app.delete("/watchlists/{watchlist_name}/{stock}")
 def remove_stock(watchlist_name:str,stock:str):

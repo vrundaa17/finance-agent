@@ -19,7 +19,7 @@ def stock_analysis():
     with col2:
         period = st.selectbox("Period", ["1mo", "3mo", "6mo", "1y"], index=1)
     with col3:
-        horizon = st.selectbox("Predict Days:",['1','5','21'],index=2)
+        horizon = st.selectbox("Predict Days:",['1','5','21'],index=0)
 
     run_col, chart_col = st.columns(2)
     with run_col:

@@ -1,15 +1,18 @@
-import redis,json,hashlib
+import redis,hashlib
 from config import settings
 import threading
-
+import logging
+logger = logging.getLogger(__name__)
 r = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
 
     
-def cached_llm_call(stage,llm, prompt):
+def cached_llm_call(stage, llm, prompt):
     key = f"llm-{stage}:{hashlib.sha256(prompt.encode()).hexdigest()}"
     cached = r.get(key)
     if cached:
+        logger.info(f"[Cache HIT] {stage}")
         return cached
+    logger.info(f"[Cache MISS] {stage}")
     response = llm.invoke(prompt)
     r.set(key, response.content, ex=1800)
     return response.content
@@ -34,6 +37,6 @@ def start_event_listen():
         pubsub.subscribe('reports')
         for message in pubsub.listen():
             if message["type"]=='message':
-                print("Got your message :",message["data"])
+                logger.info("Got your message :",message["data"])
     thread= threading.Thread(target=listen,name='listen_pubsub',daemon=True)
     thread.start()

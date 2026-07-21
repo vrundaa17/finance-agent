@@ -8,7 +8,7 @@ from agent.target import calculate_targets
 from agent.find import get_kyc_of_stock, get_price_history, get_news_by_stock, get_news_finnhub
 from dotenv import load_dotenv
 import statistics
-from cache import r, cached_llm_call
+from core.cache import r, cached_llm_call
 import logging
 logger = logging.getLogger(__name__)
 
@@ -286,6 +286,7 @@ def analyse_targets(state: AgentState):
         
         
 def build_graph():
+    # l
     # stock - news - check 
     #                 route - partial
     #                       - analyse fun -high risk |  anal news -
@@ -313,15 +314,16 @@ def build_graph():
             "partial_report":"partial_report",
         } )
     graph.add_conditional_edges(
-        "analyse_fundamentals", route_after_fundamentals,{
-            'high_risk_analysis':'high_risk_analysis',
-            'analyse_news':'analyse_news',
+        "analyse_fundamentals", route_after_fundamentals, {
+            'high_risk_analysis': 'high_risk_analysis',
+            'analyse_news': 'analyse_news',
+            'analyse_risk': 'analyse_risk',
         }
     )
     graph.add_edge("high_risk_analysis","analyse_news")
-    graph.add_edge("analyse_news", "analyse_risk")
-    graph.add_edge("analyse_risk",    "analyse_targets")
-    graph.add_edge("analyse_targets", "compile_report")
+    graph.add_edge("analyse_news","analyse_risk")
+    graph.add_edge("analyse_risk","analyse_targets")
+    graph.add_edge("analyse_targets","compile_report")
     graph.add_edge("partial_report", END)
     graph.add_edge("compile_report", END)
     logger.info("Graph compiled...")

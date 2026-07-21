@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException
-import api.watchlist as watchlist
+import api.db.report_db as report_watchlist
+import api.db.predict_db as predict_watchlist
 import api.schema as schema
 import asyncio,os
 import agent.find as find
-from visualise import generate_all_charts,clear_all_charts
+from core.visualise import generate_all_charts,clear_all_charts
 from agent.target import calculate_targets
 from agent.lstm import train_pred_lstm
 from api.routes.core_route import run_report
-from agent.predict import train_pred
+# from agent.predict import train_pred
 import logging
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,13 @@ app = APIRouter(tags=['Report'])
 async def watchlist_report(request : schema.WatchlistReportRequest):
     """Run reports for multiple stocks in parallel"""
     try:
-        stocks = [run_report(st) for st in request.stock_name]
+        semaphore = asyncio.Semaphore(5)
+        async def bounded_run(stock):
+            async with semaphore:
+                return await run_report(stock)
+        stocks = [bounded_run(st) for st in request.stock_name]
         results = await asyncio.gather(*stocks, return_exceptions=True)
+        
         reports = []
         for stock, result in zip(request.stock_name, results):
             if isinstance(result, Exception):
@@ -59,19 +65,16 @@ async def watchlist_report(request : schema.WatchlistReportRequest):
 @app.get("/report/today")
 def reports_today():
     """List all stocks analysed today"""
-    return {"reports": watchlist.list_reports_today()}
+    return {"reports": report_watchlist.list_reports_today()}
 
 
 @app.get("/report/{stock_name}/cached")
 def cached_report(stock_name: str):
     """Get the last generated report without regenerating"""
     
-    stored = watchlist.get_reports(stock_name.upper())
+    stored = report_watchlist.get_reports(stock_name.upper())
     if not stored:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No reports are generated yet..."
-        )
+        raise HTTPException(status_code=404,detail=f"No reports are generated yet...")
     return stored
 
 
@@ -79,12 +82,9 @@ def cached_report(stock_name: str):
 async def report_for_named_watchlist(name: str):
     """Generate reports for all the stocks in a saved watchlist"""
     
-    stock_name= watchlist.get_stock(name)
+    stock_name= report_watchlist.get_stock(name)
     if not stock_name:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Watchlist '{name}' is empty or doesn't exist."
-        )
+        raise HTTPException(status_code=404,detail=f"Watchlist '{name}' is empty or doesn't exist.")
     request = schema.WatchlistReportRequest(stock_name=stock_name)
     return await watchlist_report(request)
 
@@ -94,10 +94,16 @@ async def report_for_named_watchlist(name: str):
 @app.get("/generate_charts/{stock_name}")
 def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamentals,volume"):
     """Generate charts for a stock and return public url"""
-    
     try:
         stock_data = find.get_kyc_of_stock(stock_name)
         price_data = find.get_price_history(stock_name,period)
+    except ValueError as e:
+        raise HTTPException(status_code = 429, detail=str(e))
+    except Exception as e:
+        logger.error(f"Target fetch failed for {stock_name}: {str(e)}")
+        raise HTTPException(status_code =502,detail='Failed to fetch stock data')
+        
+    try:
         paths = generate_all_charts(chart_types,price_data,stock_data,stock_name)
         base_url= os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
         urls = {
@@ -109,7 +115,7 @@ def get_charts(stock_name: str, period: str = "3mo",chart_types:str="fundamental
         return {"stock": stock_name.upper(), "charts": urls}
     except Exception as e:
         logger.error(f"Chart generation failed : {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/charts-clear")
@@ -125,56 +131,77 @@ def get_targets(stock_name : str, period:str = "3mo"):
     try :
         fundamentals = find.get_kyc_of_stock(stock_name)
         price_history = find.get_price_history(stock_name,period)
+    except ValueError as e:
+        raise HTTPException(status_code = 429, detail=str(e))
+    except Exception as e:
+        logger.error(f"Target fetch failed for {stock_name}: {str(e)}")
+        raise HTTPException(status_code =502,detail='Failed to fetch stock data')
+    
+    try:
         return calculate_targets(price_history,fundamentals)
     except Exception as e:
+        logger.error(f"Target Calculated failed for {stock_name} : {str(e)}")
         raise HTTPException(status_code = 400, detail=str(e))
 
 
 @app.get("/predict/{stock_name}")
-def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):
+def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):    
     try:
         price_history = find.get_price_history(stock_name, period)
         index_history = find.get_price_history("^NSEI", period)
-        lstm_result = train_pred_lstm(price_history, index_history, horizon=horizon)
-        saved = watchlist.save_prediction(
-            stock_name=stock_name,
-            direction=lstm_result["direction"],
-            confidence=lstm_result["confidence"],
-            accuracy=lstm_result["bd_accuracy"],
-            predicted_price=lstm_result["predicted_price"],
-            analysis_price=lstm_result["analysis_price"],
-            horizon_days=lstm_result["horizon_days"],
-        )
-        return {
-            "stock": stock_name.upper(),
-            "analysis_price": price_history["close"][-1],
-            "prediction_id": saved["id"],
-            "lstm_prediction": lstm_result,
-        }
-    except Exception as e:
-        logger.error(f"Prediction failed for {stock_name}: {str(e)}")
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Price fetch failed for {stock_name}: {str(e)}")
+        raise HTTPException(status_code=502, detail="Failed to fetch price data")
+
+
+    try:
+        lstm_result = train_pred_lstm(price_history, index_history, horizon=horizon)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"LSTM training failed for {stock_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Prediction model failed")
+    
+    
+    saved = predict_watchlist.save_prediction(
+        stock_name=stock_name,
+        direction=lstm_result["direction"],
+        confidence=lstm_result["confidence"],
+        accuracy=lstm_result["bd_accuracy"],
+        predicted_price=lstm_result["predicted_price"],
+        analysis_price=lstm_result["analysis_price"],
+        horizon_days=lstm_result["horizon_days"],
+    )
+    return {
+        "stock": stock_name.upper(),
+        "analysis_price": price_history["close"][-1],
+        "prediction_id": saved["id"],
+        "lstm_prediction": lstm_result,
+    }
+    
     
     
 @app.get("/predictions")
 def list_predictions(stock_name: str = None):
-    return watchlist.get_predictions(stock_name)
+    return predict_watchlist.get_predictions(stock_name)
 
 @app.post("/predictions/{prediction_id}/feedback")
 def human_feedback(prediction_id: int, flag: str, note: str = ""):
-    return watchlist.add_human_feedback(prediction_id, flag, note)
+    return predict_watchlist.add_human_feedback(prediction_id, flag, note)
 
 @app.post("/predictions/verify")
 def verify_prediction(stock_name: str, date: str, actual: str):
-    return watchlist.update_actual_outcome(stock_name, date, actual)
+    return predict_watchlist.update_actual_outcome(stock_name, date, actual)
 
 @app.delete("/predictions/clear")
 def clean_prediction():
-    return watchlist.clear_predictions()
+    return predict_watchlist.clear_predictions()
 
 @app.post("/predictions/verify/all")
 def verify_all_predictions():
-    return watchlist.auto_verify_predictions()
+    return predict_watchlist.auto_verify_predictions()
 
 # @app.post("/report/{stock_name}")
 # async def single_report(stock_name : str):

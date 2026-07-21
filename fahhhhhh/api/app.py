@@ -1,15 +1,14 @@
+import sys,os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db import init_db
-from scheduler import start_scheduler
-
+from core.db import init_db
+from core.scheduler import start_scheduler
 from fastapi.staticfiles import StaticFiles
 from api.routes import core_route
 from api.routes import watchlist_routes, report_routes, alert_routes
-from cache import start_event_listen
+from core.cache import start_event_listen
+from core.config import CHARTS_DIR
 from contextlib import asynccontextmanager
 import logging
 
@@ -36,15 +35,17 @@ app=FastAPI(
     lifespan=lifespan
 )
 
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:8501").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
-os.makedirs("charts", exist_ok=True)
-app.mount("/charts", StaticFiles(directory="charts"), name="charts")
+os.makedirs(CHARTS_DIR, exist_ok=True)
+app.mount("/charts", StaticFiles(directory=CHARTS_DIR), name="charts")
 
 
 app.include_router(core_route.app)

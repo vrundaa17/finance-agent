@@ -2,16 +2,17 @@ from mcp.server.fastmcp import FastMCP
 import sys,os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import agent.find as find
-import api.watchlist as watchlist
-from visualise import generate_all_charts
+import api.db.report_db as report_watchlist
+import api.db.predict_db as edit_watchlist
+import api.db.alert_db as alert_watchlist
+from core.visualise import generate_all_charts
 import base64
 from mcp.types import Resource
-from urllib.parse import quote
 from agent.analyse import build_graph
 from agent.lstm import train_pred_lstm
 from agent.target import calculate_targets
 
-mcp = FastMCP("yousta")
+mcp = FastMCP("fahhhh")
 graph = build_graph()
 
 
@@ -25,7 +26,7 @@ def analyse_stock(stock_name:str)-> dict:
     result = graph.invoke({"stock_name": stock_name.upper()})
     report = result.get('report') or result.get('error')
     if result.get('report'):
-        watchlist.report(stock_name,report)
+        report_watchlist.report(stock_name,report)
     return report
 
 
@@ -114,17 +115,17 @@ def charts(chart_types: list[str], stock_name: str, period: str = "3mo") -> dict
 def create_watchlist(watchlist_name):
     """Create a new named watchlist to track a group of stocks.
     Example: create_new_watchlist('uncle_portfolio') or create_new_watchlist('tech_stocks')."""
-    return watchlist.create_watchlist(watchlist_name)
+    return report_watchlist.create_watchlist(watchlist_name)
 
 @mcp.tool()
 def list_watchlist():
     """ Show all existing watchlists with their names and ticker counts."""
-    return watchlist.list_watchlist()
+    return report_watchlist.list_watchlist()
 
 @mcp.tool()
 def delete_watchlist(watchlist_name:str):
     """Delete a watchlist and all its tickers permanently."""
-    return watchlist.delete_watchlist(watchlist_name)
+    return report_watchlist.delete_watchlist(watchlist_name)
 
 @mcp.tool()
 def add_stock(watchlist_name,stock_name,note):
@@ -132,19 +133,19 @@ def add_stock(watchlist_name,stock_name,note):
     ticker: stock symbol e.g. AAPL, TSLA, RELIANCE.NS
     notes: optional note e.g. 'Client A holding', 'High conviction'
     Creates the watchlist if it doesn't exist yet."""
-    return watchlist.add_stock(watchlist_name,stock_name,note)
+    return report_watchlist.add_stock(watchlist_name,stock_name,note)
 
 
 @mcp.tool()
 def list_stock(watchlist_name):
     """Get all tickers in a named watchlist.
     Returns a list of ticker symbols."""
-    return watchlist.get_stock(watchlist_name)
+    return report_watchlist.get_stock(watchlist_name)
 
 @mcp.tool()
 def remove_stock(watchlist_name,stock_name):
     """Remove a stock ticker from a watchlist."""
-    return watchlist.remove_stock(watchlist_name,stock_name)
+    return report_watchlist.remove_stock(watchlist_name,stock_name)
 
 
 @mcp.tool()
@@ -152,7 +153,7 @@ def get_report(stock_name:str):
     """Get the most recently cached report for a ticker without regenerating.
     Useful when the stock needs to be re-c
     """
-    report = watchlist.get_reports(stock_name)
+    report = report_watchlist.get_reports(stock_name)
     if not report:
         return{'error':f'No report for {stock_name}.Run analyse_stock.first'}
     return report 
@@ -171,14 +172,14 @@ def set_price_alert(stock_name: str, condition: str, threshold: float,
     expires_days: days until alert auto-deletes if not triggered (default 30)
     Example: set_price_alert('RELIANCE.NS', 'below', 1200, is_persistent=True)
     """
-    return watchlist.add_alert(stock_name, condition, threshold, is_persistent, expires_days)
+    return alert_watchlist.add_alert(stock_name, condition, threshold, is_persistent, expires_days)
 
 @mcp.tool()
 def view_alerts(stock_name: str = "") -> list:
     """
     View all price alerts. Optionally filter by stock name.
     """
-    return watchlist.get_alerts(stock_name.upper() if stock_name else None)
+    return alert_watchlist.get_alerts(stock_name.upper() if stock_name else None)
 
 @mcp.tool()
 def view_alert_log() -> list:
@@ -186,7 +187,7 @@ def view_alert_log() -> list:
     View all triggered price alerts with the price at trigger time.
     Use this to see what alerts fired and when.
     """
-    return watchlist.get_alert_log()
+    return alert_watchlist.get_alert_log()
 
 @mcp.tool()
 def predict_stock(stock_name: str, horizon: int = 5) -> dict:
@@ -196,7 +197,7 @@ def predict_stock(stock_name: str, horizon: int = 5) -> dict:
     price_history = find.get_price_history(stock_name, "3y")
     index_history = find.get_price_history("^NSEI", "3y")
     result = train_pred_lstm(price_history, index_history, horizon=horizon)
-    watchlist.save_prediction(
+    alert_watchlist.save_prediction(
         stock_name=stock_name, direction=result["direction"],
         confidence=result["confidence"], accuracy=result["bd_accuracy"],
         predicted_price=result["predicted_price"], current_price=result["current_price"],
@@ -244,7 +245,7 @@ def market_news(limit: int = 8) -> dict:
 @mcp.tool()
 def analyse_watchlist(watchlist_name: str) -> dict:
     """Run the full AI stock report for every ticker in a saved watchlist."""
-    tickers = watchlist.get_stock(watchlist_name)
+    tickers = report_watchlist.get_stock(watchlist_name)
     if not tickers:
         return {"error": f"Watchlist '{watchlist_name}' not found or empty."}
     results = {}
@@ -253,7 +254,7 @@ def analyse_watchlist(watchlist_name: str) -> dict:
             result = graph.invoke({"stock_name": stock.upper()})
             report = result.get("report") or result.get("error")
             if result.get("report"):
-                watchlist.report(stock, report, targets=result.get("targets"))
+                report_watchlist.report(stock, report, targets=result.get("targets"))
             results[stock] = report
         except Exception as e:
             results[stock] = f"error: {str(e)}"
@@ -264,7 +265,7 @@ def analyse_watchlist(watchlist_name: str) -> dict:
 def get_predictions(stock_name: str = "") -> list:
     """View past LSTM predictions, optionally filtered by ticker. Use this to find a
     prediction's id before calling add_prediction_feedback."""
-    return watchlist.get_predictions(stock_name.upper() if stock_name else None)
+    return edit_watchlist.get_predictions(stock_name.upper() if stock_name else None)
 
 
 @mcp.tool()
@@ -272,7 +273,7 @@ def add_prediction_feedback(prediction_id: int, flag: str, note: str = "") -> di
     """Add human feedback on a past LSTM prediction.
     flag: e.g. 'correct', 'incorrect', 'unsure'.
     """
-    return watchlist.add_human_feedback(prediction_id, flag, note)
+    return edit_watchlist.add_human_feedback(prediction_id, flag, note)
 
 if __name__ == "__main__":
     mcp.run()

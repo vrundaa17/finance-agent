@@ -1,10 +1,11 @@
 import yfinance as yf
 import finnhub 
 import pandas as pd
-import os,json
-from cache import r, check_ratelimit
+import os,utils
+from core.cache import r, check_ratelimit
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import utils
 from dotenv import load_dotenv
 import logging 
 logger = logging.getLogger(__name__)
@@ -18,9 +19,9 @@ def get_kyc_of_stock(sname):
         raise ValueError("too many requests to yfinance")
     cached = r.get(f"kyc:{sname}")
     if cached:
-        return json.loads(cached)
+        return utils.loads_or_none(cached)
     
-    stock = yf.Ticker(sname)
+    stock = yf.Ticker(utils._normalise_stock(sname))
     info = stock.info
     
     if not info or (info.get("currentPrice") is None and info.get("regularMarketPrice") is None):
@@ -48,19 +49,19 @@ def get_kyc_of_stock(sname):
         "debt_to_equity": info.get("debtToEquity"),
         "revenue_growth": info.get("revenueGrowth"),
     }
-    r.set(f"kyc:{sname}",json.dumps(result), ex=120)
+    r.set(f"kyc:{sname}",utils.dumps_or_none(result), ex=120)
     return result
     
 
 def get_price_history(sname,period='5d'):
-    if not check_ratelimit("yfinance",limit=100,window=60):
+    if not check_ratelimit("yfinance",limit=600,window=60):
         raise ValueError("too many requests to yfinance")
     
     cached = r.get(f"price_history:{sname}:{period}")
     if cached:
-        return json.loads(cached)
+        return utils.loads_or_none(cached)
     
-    stock = yf.Ticker(sname)
+    stock = yf.Ticker(utils._normalise_stock(sname))
     hist = stock.history(period=period)
     if hist.empty:
         logger.error(f"{sname} - no history ")
@@ -74,11 +75,11 @@ def get_price_history(sname,period='5d'):
         "low": hist["Low"].round(2).tolist(),
         "volume": hist["Volume"].tolist(),
     }
-    r.set(f"price_history:{sname}:{period}", json.dumps(result), ex=300)
+    r.set(f"price_history:{sname}:{period}", utils.dumps_or_none(result), ex=300)
     return result
     
 def get_statement(sname,types='balance_sheet'):
-    stock = yf.Ticker(sname)
+    stock = yf.Ticker(utils._normalise_stock(sname))
     
     statement ={
         'balance_sheet': stock.balance_sheet,
@@ -118,9 +119,9 @@ def get_statement(sname,types='balance_sheet'):
 def get_news_by_stock(sname):
     cached = r.get(f"news:{sname}")
     if cached:
-        return json.loads(cached)
+        return utils.loads_or_none(cached)
     
-    stock = yf.Ticker(sname)
+    stock = yf.Ticker(utils._normalise_stock(sname))
     news = stock.news
     if not news:
         raise ValueError("no recent news ")
@@ -135,14 +136,14 @@ def get_news_by_stock(sname):
             "source": content.get("provider",{}).get("displayName"),
             "url" : content.get("canonicalUrl",{}).get("url")
         })
-    r.set(f"news:{sname}",json.dumps(info),ex=600) 
+    r.set(f"news:{sname}",utils.dumps_or_none(info),ex=600) 
     return info
 
 
 def get_news_finnhub(category="general"):
     cached = r.get(f"news:{category}")
     if cached:
-        return json.loads(cached)
+        return utils.loads_or_none(cached)
     
     news = client.general_news(category)
     if not news:
@@ -155,7 +156,7 @@ def get_news_finnhub(category="general"):
         "time": item.get("datetime",'')
         
     }for item in news]
-    r.set(f"news:{category}",json.dumps(result),ex=900)
+    r.set(f"news:{category}",utils.dumps_or_none(result),ex=900)
     return result
     
 

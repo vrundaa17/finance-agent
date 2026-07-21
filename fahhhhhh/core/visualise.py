@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.dates as mdates
 from datetime import datetime
-import time
+from config import CHARTS_DIR
+import logging
+logger = logging.getLogger(__name__)
 
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "charts")
+OUTPUT_DIR = CHARTS_DIR
 
 
 def _parse_dates(date_string)-> list[datetime]:
@@ -164,26 +166,26 @@ def plot_fundamentals_snapshot(fundamentals: dict, ticker: str) -> str:
  
 def generate_all_charts(chart_types: list[str],price_history: dict, fundamentals: dict, ticker: str) -> dict:
     paths = {}
-    print("chart_types: ",chart_types)
+    logger.info("chart_types: ",chart_types)
     if "price" in chart_types:
         try:
             paths["price"] = plot_price_history(price_history, ticker)
         except Exception as e:
             paths["price"] = None
-            print(f"price chart failed: {e}")
+            logger.error(f"price chart failed: {e}")
     if "volume" in chart_types:
         try:
             paths["volume"] = plot_volume(price_history, ticker)
         except Exception as e:
             paths["volume"] = None
-            print(f"volume chart failed: {e}")
+            logger.error(f"volume chart failed: {e}")
             
     if "fundamentals" in chart_types:
         try:
             paths["fundamentals"] = plot_fundamentals_snapshot(fundamentals, ticker)
         except Exception as e:
             paths["fundamentals"] = None
-            print(f"fundamentals chart failed: {e}")
+            logger.error(f"fundamentals chart failed: {e}")
  
     return paths
 
@@ -201,7 +203,7 @@ def clear_all_charts():
                 os.remove(filepath)
                 deleted += 1
             except OSError as e:
-                print(f"Could not delete {filepath}: {e}")
+                logger.error(f"Could not delete {filepath}: {e}")
     return deleted
         
 # if __name__ =="__main__":
@@ -210,4 +212,4 @@ def clear_all_charts():
 #     kyc_data= get_kyc_of_stock('CIPLA.NS')
 #     paths = generate_all_charts(price_history, kyc_data, "CIPLA.NS")
 #     for name, path in paths.items():
-#         print(f"  {name}: {path}")
+#         logger.info(f"  {name}: {path}")
