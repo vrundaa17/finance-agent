@@ -192,8 +192,8 @@ def predict_stock(stock_name:str, period: str="3y", horizon: int = 5):
     
     
 @app.get("/predictions")
-def list_predictions(stock_name: str = None):
-    return predict_watchlist.get_predictions(stock_name)
+def list_predictions(stock_name: str = None, limit: int = 50, offset: int = 0):
+    return predict_watchlist.get_predictions(stock_name, limit, offset)
 
 @app.post("/predictions/{prediction_id}/feedback")
 def human_feedback(prediction_id: int, flag: str, note: str = ""):

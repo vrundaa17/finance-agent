@@ -28,19 +28,19 @@ def save_prediction(stock_name: str, direction: str, confidence: float, accuracy
         conn.commit()
         return {"status": "saved", "stock": stock_name.upper(), "direction": direction,'id':cur.lastrowid}
 
-def get_predictions(stock_name: str = None) -> list[dict]:
+def get_predictions(stock_name: str = None, limit: int = 50, offset: int = 0) -> list[dict]:
     with get_connection() as conn:
         if stock_name:
             rows = conn.execute(
-                "SELECT * FROM predict_log WHERE stock_name = ? ORDER BY predicted_at DESC",
-                (stock_name.upper(),)
+                "SELECT * FROM predict_log WHERE stock_name = ? ORDER BY predicted_at DESC LIMIT ? OFFSET ?",
+                (stock_name.upper(), limit, offset)
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM predict_log ORDER BY predicted_at DESC LIMIT 50"
+                "SELECT * FROM predict_log ORDER BY predicted_at DESC LIMIT ? OFFSET ?",
+                (limit, offset)
             ).fetchall()
         return [dict(r) for r in rows]
-    
     
 def update_actual_outcome(stock_name: str, date: str, actual: str):
     with get_connection() as conn:

@@ -127,8 +127,11 @@ def edit():
     
     st.markdown('<div class="section-label">Prediction Review</div>', unsafe_allow_html=True)
     st.caption("Review past predictions and give feedback to improve the model")
+    
+    if "pred_offset" not in st.session_state:
+        st.session_state.pred_offset = 0
 
-    preds, _ = api.api_get("/predictions")
+    preds, _ = api.api_get(f"/predictions?limit=50&offset={st.session_state.pred_offset}")
 
     if preds:
         total= len(preds)
@@ -145,7 +148,7 @@ def edit():
         st.divider()
         table_rows = []
 
-        for p in preds[:20]:
+        for p in preds:
             table_rows.append({
                 "Date": p["predicted_at"][:10],
                 "Stock": p["stock_name"],
@@ -163,6 +166,19 @@ def edit():
 
         df = pd.DataFrame(table_rows)
 
+        df = pd.DataFrame(table_rows)
+
+        col_a, col_b = st.columns([10, 1])
+        with col_a:
+            if st.session_state.pred_offset > 0:
+                if st.button("← Newer"):
+                    st.session_state.pred_offset = max(0, st.session_state.pred_offset - 50)
+                    st.rerun()
+        with col_b:
+            if len(preds) == 50:
+                if st.button("Load older →"):
+                    st.session_state.pred_offset += 50
+                    st.rerun()
         event = st.dataframe(
             df.style.set_properties(
         **{
