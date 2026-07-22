@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import api.db.report_db as watchlist
+import api.db_repo.report_db as watchlist
 import api.schema as schema
 import utils
 app= APIRouter(tags=['Watchlist'])

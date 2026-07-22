@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-import api.db.report_db as report_watchlist
-import api.db.predict_db as predict_watchlist
+import api.db_repo.report_db as report_watchlist
+import api.db_repo.predict_db as predict_watchlist
 import api.schema as schema
 import asyncio,os
 import agent.find as find

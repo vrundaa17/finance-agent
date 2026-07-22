@@ -5,9 +5,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 import yfinance as yf
 import pytz,asyncio
 from api.routes.core_route import run_report
-import api.db.report_db as report_watchlist
-import api.db.alert_db as alert_watchlist
-import api.db.predict_db as edit_watchlist
+import api.db_repo.report_db as report_watchlist
+import api.db_repo.alert_db as alert_watchlist
+import api.db_repo.predict_db as edit_watchlist
 from core.visualise import clear_all_charts
 from core.cache import set_job_state,r
 from core.celery_app import celery_app

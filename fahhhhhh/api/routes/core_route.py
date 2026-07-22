@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-import api.db.report_db as report_watchlist
-import api.db.predict_db as predict_watchlist
+import api.db_repo.report_db as report_watchlist
+import api.db_repo.predict_db as predict_watchlist
 import agent.find as find
 import asyncio,datetime
 from agent.analyse import build_graph

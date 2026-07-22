@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import api.db.alert_db as watchlist
+import api.db_repo.alert_db as watchlist
 from api.schema import AlertCreate
 import utils
 app = APIRouter(tags=['Alert'])

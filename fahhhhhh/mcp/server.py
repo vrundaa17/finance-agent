@@ -2,9 +2,9 @@ from mcp.server.fastmcp import FastMCP
 import sys,os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import agent.find as find
-import api.db.report_db as report_watchlist
-import api.db.predict_db as edit_watchlist
-import api.db.alert_db as alert_watchlist
+import api.db_repo.report_db as report_watchlist
+import api.db_repo.predict_db as edit_watchlist
+import api.db_repo.alert_db as alert_watchlist
 from core.visualise import generate_all_charts
 import base64
 from mcp.types import Resource
