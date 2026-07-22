@@ -13,9 +13,23 @@ services:
     env_file:
       - .env
     volumes:
-      - ./db:/app/db
-      - ./charts:/app/charts
+      - ./data:/app/data
+    depends_on:
+      - redis
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: celery -A core.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+      
   front:
     build:
       context: .

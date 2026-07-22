@@ -1,23 +1,17 @@
-import sys
-import os
-from datetime import datetime,timedelta
-sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import yfinance as yf
 import pytz,asyncio
-import agent.find as find
-
 from api.routes.core_route import run_report
 import api.db.report_db as report_watchlist
 import api.db.alert_db as alert_watchlist
 import api.db.predict_db as edit_watchlist
-
 from core.visualise import clear_all_charts
+from core.cache import set_job_state,r
+from core.celery_app import celery_app
 
-from cache import set_job_state,r
-from celery_app import celery_app
 import logging
 logger = logging.getLogger(__name__)
 
@@ -112,7 +106,7 @@ def start_scheduler():
     scheduler = BackgroundScheduler(timezone=IST)
     scheduler.add_job(
         run_daily_reports,
-        CronTrigger(hour=11, minute=6, timezone=IST),
+        CronTrigger(hour=12, minute=46, timezone=IST),
         id="daily_reports",
         name="Daily market reports",
         replace_existing=True,

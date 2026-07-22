@@ -261,8 +261,8 @@ def high_risk_analysis(state:AgentState):
 
         End with: HIGH RISK RATING. This is not financial advice.
     """
-    response = llm.invoke(prompt)
-    return {**state, "analysis_risk":response.content, "risk_level":"HIGH"}
+    content = cached_llm_call("high_risk", llm, prompt)
+    return {**state, "analysis_risk": content, "risk_level": "HIGH"}
 
 
 def analyse_targets(state: AgentState):
@@ -275,22 +275,14 @@ def analyse_targets(state: AgentState):
     return {**state, "targets": targets}
 
 
-# def route_after_news_fetch(state:AgentState):
-    news = state.get("news",{})
-    articles = news.get("articles",[]) if news else []
-    
-    if not articles:
-        return "analyse_risk"
-    return "analyse_news"
     
         
         
 def build_graph():
-    # l
+
     # stock - news - check 
     #                 route - partial
-    #                       - analyse fun -high risk |  anal news -
-    #                                           
+    #                       - analyse fun -high risk |  anal news                                            
     graph = StateGraph(AgentState)
     
     graph.add_node("fetch_fundamentals",fetch_fundamentals)

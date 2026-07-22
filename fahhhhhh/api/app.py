@@ -7,7 +7,7 @@ from core.scheduler import start_scheduler
 from fastapi.staticfiles import StaticFiles
 from api.routes import core_route
 from api.routes import watchlist_routes, report_routes, alert_routes
-from core.cache import start_event_listen
+# from core.cache import start_event_listen
 from core.config import CHARTS_DIR
 from contextlib import asynccontextmanager
 import logging
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     init_db()
     core_route.init_graph()
     scheduler= start_scheduler()
-    start_event_listen()
+    # start_event_listen()
     yield
     scheduler.shutdown()
 

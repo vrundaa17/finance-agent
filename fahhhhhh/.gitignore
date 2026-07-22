@@ -14,3 +14,8 @@ venv/
 ml/
 *.ipynb
 ok.py
+data/
+data/watchlist.db
+data/charts/
+predict.py
+

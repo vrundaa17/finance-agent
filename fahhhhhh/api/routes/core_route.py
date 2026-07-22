@@ -8,9 +8,10 @@ from agent.analyse import build_graph
 from agent.lstm import train_pred_lstm
 from core.db import check_db_health
 from core.celery_app import check_celery_health
+from core.cache import r
 import logging,utils
 logger = logging.getLogger(__name__)
-from core.cache import r
+
 app = APIRouter(tags=['core'])
 graph= None
 
@@ -23,7 +24,7 @@ def init_graph():
 
 
 
-async def run_report(stock_name: str, horizon: int = 5):
+async def run_report(stock_name: str, horizon: int = 1):
     
     if report_watchlist.is_reported_today(stock_name):
         cached = report_watchlist.get_reports(stock_name)
@@ -93,11 +94,10 @@ async def get_quotes(tickers: str):
     semaphore = asyncio.Semaphore(5)
     loop = asyncio.get_event_loop()
     
-    # quotes = []
     async def fetch_one(sym):
         async with semaphore:
             try:
-                data = await loop.run_in_executor(None, find.get_kyc_of_stock ,sym)
+                data = await loop.run_in_executor(None, find.get_kyc_of_stock, sym)
                 price = data.get("current_price")
                 prev = data.get("previous_close")
                 change = round(price - prev, 2) if price and prev else None
@@ -108,12 +108,12 @@ async def get_quotes(tickers: str):
                     "current_price": price,
                     "change": change,
                     "change_pct": change_pct,
-            }
+                }
             except ValueError as e:
-                raise HTTPException(status_code=503, detail=str(e))
+                return {"stock_name": sym, "error": str(e)}
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-            
+                return {"stock_name": sym, "error": str(e)}
+
     quote = await asyncio.gather(*(fetch_one(sym) for sym in symbols))
     logger.info("Live stocks fetched...")
     return {"quotes": quote}

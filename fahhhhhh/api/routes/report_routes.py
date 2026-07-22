@@ -5,10 +5,13 @@ import api.schema as schema
 import asyncio,os
 import agent.find as find
 from core.visualise import generate_all_charts,clear_all_charts
+from core.cache import r
 from agent.target import calculate_targets
 from agent.lstm import train_pred_lstm
 from api.routes.core_route import run_report
 # from agent.predict import train_pred
+
+import utils
 import logging
 logger = logging.getLogger(__name__)
 
@@ -144,8 +147,10 @@ def get_targets(stock_name : str, period:str = "3mo"):
         raise HTTPException(status_code = 400, detail=str(e))
 
 
+
+
 @app.get("/predict/{stock_name}")
-def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):    
+def predict_stock(stock_name:str, period: str="3y", horizon: int = 5):
     try:
         price_history = find.get_price_history(stock_name, period)
         index_history = find.get_price_history("^NSEI", period)
@@ -155,16 +160,20 @@ def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):
         logger.error(f"Price fetch failed for {stock_name}: {str(e)}")
         raise HTTPException(status_code=502, detail="Failed to fetch price data")
 
+    lstm_key = f"lstm:{stock_name.upper()}:{horizon}"
+    cached = r.get(lstm_key)
+    if cached:
+        lstm_result = utils.loads_or_none(cached)
+    else:
+        try:
+            lstm_result = train_pred_lstm(price_history, index_history, horizon=horizon)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"LSTM training failed for {stock_name}: {str(e)}")
+            raise HTTPException(status_code=500, detail="Prediction model failed")
+        r.set(lstm_key, utils.dumps_or_none(lstm_result), ex=3600)
 
-    try:
-        lstm_result = train_pred_lstm(price_history, index_history, horizon=horizon)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"LSTM training failed for {stock_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Prediction model failed")
-    
-    
     saved = predict_watchlist.save_prediction(
         stock_name=stock_name,
         direction=lstm_result["direction"],
@@ -179,8 +188,7 @@ def predict_stock(stock_name:str, period: str="3y",horizon: int = 5):
         "analysis_price": price_history["close"][-1],
         "prediction_id": saved["id"],
         "lstm_prediction": lstm_result,
-    }
-    
+    }    
     
     
 @app.get("/predictions")

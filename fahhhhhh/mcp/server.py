@@ -197,12 +197,12 @@ def predict_stock(stock_name: str, horizon: int = 5) -> dict:
     price_history = find.get_price_history(stock_name, "3y")
     index_history = find.get_price_history("^NSEI", "3y")
     result = train_pred_lstm(price_history, index_history, horizon=horizon)
-    alert_watchlist.save_prediction(
+    edit_watchlist.save_prediction(
         stock_name=stock_name, direction=result["direction"],
         confidence=result["confidence"], accuracy=result["bd_accuracy"],
-        predicted_price=result["predicted_price"], current_price=result["current_price"],
+        predicted_price=result["predicted_price"], analysis_price=result["analysis_price"],
         horizon_days=result["horizon_days"],
-    )
+    )   
     return result
 
 
@@ -277,4 +277,3 @@ def add_prediction_feedback(prediction_id: int, flag: str, note: str = "") -> di
 
 if __name__ == "__main__":
     mcp.run()
-    

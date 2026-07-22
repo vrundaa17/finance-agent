@@ -1,6 +1,6 @@
 import redis,hashlib
-from config import settings
-import threading
+from core.config import settings
+# import threading
 import logging
 logger = logging.getLogger(__name__)
 r = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
@@ -31,12 +31,12 @@ def set_job_state(job_id,status):
 def get_job_state(job_id):
     return r.get(f"job:{job_id}")
 
-def start_event_listen():
-    def listen():
-        pubsub = r.pubsub()
-        pubsub.subscribe('reports')
-        for message in pubsub.listen():
-            if message["type"]=='message':
-                logger.info("Got your message :",message["data"])
-    thread= threading.Thread(target=listen,name='listen_pubsub',daemon=True)
-    thread.start()
+# def start_event_listen():
+#     def listen():
+#         pubsub = r.pubsub()
+#         pubsub.subscribe('reports')
+#         for message in pubsub.listen():
+#             if message["type"]=='message':
+#                 logger.info(f"Got your message: {message['data']}")
+#     thread= threading.Thread(target=listen,name='listen_pubsub',daemon=True)
+#     thread.start()
